@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from saas.cryptography.keypair import KeyPair
-from saas.helpers import validate_json
-from saas.keystore.asset import Asset, deserialise, serialise
+from saascore.cryptography.keypair import KeyPair
+from saascore.helpers import validate_json
+from saascore.keystore.asset import Asset, deserialise, serialise
 
 
 class ContentKeysAsset(Asset):

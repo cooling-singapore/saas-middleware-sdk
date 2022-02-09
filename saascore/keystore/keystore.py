@@ -7,19 +7,19 @@ from typing import Any
 
 import pydantic
 
-from saas.cryptography.eckeypair import ECKeyPair
-from saas.cryptography.helpers import hash_json_object
-from saas.cryptography.keypair import KeyPair
-from saas.cryptography.rsakeypair import RSAKeyPair
-from saas.helpers import generate_random_string, write_json_to_file
-from saas.keystore.asset import Asset
-from saas.keystore.assets.contentkeys import ContentKeysAsset
-from saas.keystore.assets.credentials import CredentialsAsset
-from saas.keystore.assets.keypair import KeyPairAsset, MasterKeyPairAsset
-from saas.keystore.exceptions import KeystoreException
-from saas.keystore.identity import Identity
-from saas.keystore.schemas import SerializedKeystore, KeystoreObject
-from saas.log import Logging
+from saascore.cryptography.eckeypair import ECKeyPair
+from saascore.cryptography.helpers import hash_json_object
+from saascore.cryptography.keypair import KeyPair
+from saascore.cryptography.rsakeypair import RSAKeyPair
+from saascore.helpers import generate_random_string, write_json_to_file
+from saascore.keystore.asset import Asset
+from saascore.keystore.assets.contentkeys import ContentKeysAsset
+from saascore.keystore.assets.credentials import CredentialsAsset
+from saascore.keystore.assets.keypair import KeyPairAsset, MasterKeyPairAsset
+from saascore.keystore.exceptions import KeystoreException
+from saascore.keystore.identity import Identity
+from saascore.keystore.schemas import SerializedKeystore, KeystoreObject
+from saascore.log import Logging
 
 logger = Logging.get('keystore.Keystore')
 

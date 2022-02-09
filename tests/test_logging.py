@@ -3,7 +3,7 @@ import shutil
 import tempfile
 import unittest
 
-from saas.log import Logging
+from saascore.log import Logging
 
 
 class LoggingTestCase(unittest.TestCase):

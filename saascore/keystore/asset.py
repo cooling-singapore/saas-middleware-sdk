@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from copy import copy
 from typing import Any
 
-import saas.cryptography.keypair as keypair
+import saascore.cryptography.keypair as keypair
 
 
 def serialise(content: dict, protect_with: keypair.KeyPair = None, protected_properties: list = None) -> dict:

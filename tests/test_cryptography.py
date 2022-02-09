@@ -4,16 +4,12 @@ import unittest
 import logging
 import os
 
-from saas.cryptography.eckeypair import ECKeyPair
-from saas.cryptography.rsakeypair import RSAKeyPair
+from saascore.cryptography.eckeypair import ECKeyPair
+from saascore.cryptography.rsakeypair import RSAKeyPair
+from saascore.log import Logging
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s [%(levelname)s] [%(name)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-
-logger = logging.getLogger(__name__)
+Logging.initialise(level=logging.DEBUG)
+logger = Logging.get(__name__)
 
 
 class ECKeyPairTestCases(unittest.TestCase):

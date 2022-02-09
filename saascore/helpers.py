@@ -6,7 +6,7 @@ import jsonschema
 
 from typing import Union
 
-from saas.log import Logging
+from saascore.log import Logging
 
 logger = Logging.get('helpers')
 

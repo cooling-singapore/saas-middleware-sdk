@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from saas.cryptography.eckeypair import ECKeyPair
-from saas.cryptography.keypair import KeyPair
-from saas.cryptography.rsakeypair import RSAKeyPair
-from saas.helpers import validate_json
-from saas.keystore.asset import Asset, deserialise, serialise
-from saas.keystore.exceptions import KeystoreException
+from saascore.cryptography.eckeypair import ECKeyPair
+from saascore.cryptography.keypair import KeyPair
+from saascore.cryptography.rsakeypair import RSAKeyPair
+from saascore.helpers import validate_json
+from saascore.keystore.asset import Asset, deserialise, serialise
+from saascore.keystore.exceptions import KeystoreException
 
 
 class KeyPairAsset(Asset):

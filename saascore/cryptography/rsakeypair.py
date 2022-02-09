@@ -6,16 +6,14 @@ from typing import Optional
 
 import cryptography.hazmat.primitives.serialization as serialization
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
-
-from saas.cryptography.keypair import KeyPair
-
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.backends import default_backend
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from saas.log import Logging
+from saascore.cryptography.keypair import KeyPair
+from saascore.log import Logging
 
 logger = Logging.get('cryptography.RSAKeyPair')
 

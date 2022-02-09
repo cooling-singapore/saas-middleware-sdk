@@ -3,10 +3,10 @@ from __future__ import annotations
 from copy import copy
 from typing import TypeVar, Generic
 
-from saas.keystore.asset import Asset, deserialise, serialise
+from saascore.keystore.asset import Asset, deserialise, serialise
 
-import saas.cryptography.keypair as keypair
-import saas.helpers as helpers
+import saascore.cryptography.keypair as keypair
+import saascore.helpers as helpers
 
 
 class Credentials:

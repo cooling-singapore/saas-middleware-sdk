@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from saas.cryptography.eckeypair import ECKeyPair
-from saas.cryptography.keypair import KeyPair
-from saas.cryptography.rsakeypair import RSAKeyPair
-from saas.keystore.schemas import Identity as IdentitySchema
+from saascore.cryptography.eckeypair import ECKeyPair
+from saascore.cryptography.keypair import KeyPair
+from saascore.cryptography.rsakeypair import RSAKeyPair
+from saascore.keystore.schemas import Identity as IdentitySchema
 
 
 @dataclass

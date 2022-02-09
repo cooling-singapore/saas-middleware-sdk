@@ -1,4 +1,4 @@
-import saas.helpers as helpers
+from saascore import helpers
 
 
 class SaaSException(Exception):

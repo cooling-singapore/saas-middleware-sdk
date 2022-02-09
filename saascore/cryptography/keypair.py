@@ -2,9 +2,9 @@ from abc import abstractmethod, ABC
 
 import cryptography.hazmat.primitives.serialization as serialization
 
-from saas.cryptography.exceptions import NoPrivateKeyFoundError
-from saas.cryptography.helpers import hash_bytes_object
-from saas.log import Logging
+from saascore.cryptography.exceptions import NoPrivateKeyFoundError
+from saascore.cryptography.helpers import hash_bytes_object
+from saascore.log import Logging
 
 logger = Logging.get('cryptography.KeyPair')
 

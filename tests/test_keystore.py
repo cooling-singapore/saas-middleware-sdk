@@ -4,16 +4,12 @@ import unittest
 import logging
 import os
 
-from saas.keystore.assets.credentials import CredentialsAsset, GithubCredentials, SSHCredentials
-from saas.keystore.keystore import Keystore
+from saascore.keystore.assets.credentials import CredentialsAsset, GithubCredentials, SSHCredentials
+from saascore.keystore.keystore import Keystore
+from saascore.log import Logging
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s [%(levelname)s] [%(name)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-
-logger = logging.getLogger(__name__)
+Logging.initialise(level=logging.DEBUG)
+logger = Logging.get(__name__)
 
 
 class KeystoreTestCase(unittest.TestCase):

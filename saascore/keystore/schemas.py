@@ -2,9 +2,9 @@ from typing import List, Dict, Union
 
 from pydantic import BaseModel, validator
 
-from saas.keystore.asset import Asset
-from saas.keystore.assets.keypair import KeyPairAsset
-from saas.keystore.exceptions import KeystoreException
+from saascore.keystore.asset import Asset
+from saascore.keystore.assets.keypair import KeyPairAsset
+from saascore.keystore.exceptions import KeystoreException
 
 REQUIRED_ASSETS = ["master-key", "signing-key", "encryption-key"]
 
