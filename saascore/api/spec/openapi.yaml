@@ -62,7 +62,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/data_object_meta"
+                type: array
+                items:
+                  $ref: "#/components/schemas/data_object_meta"
         500:
           description: "Error"
           content:
@@ -72,7 +74,7 @@ paths:
 
   /api/v1/repository/statistics:
     get:
-      description: "Retrieves some statistics from the DOR."
+      description: "Retrieves some statistics from the DOR. It returns a list of all data types, data formats and tags found in the DOR."
       tags:
         - DOR (Data Object Repository)
       responses:
@@ -136,7 +138,7 @@ paths:
                         example: "32tm2i6ba6v7lw59tfduvldt8ofai40grxogy2k3hi4hnzt6do0zcwx9k3e23j9h"
                       created_by:
                         type: string
-                        description: "A reference to who created the data object."
+                        description: "A reference to the ID of the identity which created the data object."
                         example: "581e2571c6fa8ba01ba6456df4d1fe175abe952362ee925dc9396e67d7fbeeaf"
                       data_type:
                         description: "The data type of the data object."
@@ -195,7 +197,7 @@ paths:
       description: "Adds a new Git-Processor-Pointer (GPP) data object to the DOR and returns the meta information for this data object.
         If the repository specified in the GPP information (see 'source' field) is private, valid GitHub credentials need to be provided. 
         The DOR will use these credentials to access (i.e., clone) the repository. The credentials information will not be stored by the
-        DOR. It is not required to specify the `proc_descriptor` when adding a GPP to the DOR."
+        DOR."
       tags:
         - DOR (Data Object Repository)
       requestBody:
@@ -228,21 +230,8 @@ paths:
                     - owner_iid
                     - created_by
                     - gpp
-
-                files:
-                  description: "A single file containing the contents of the data object."
-                  type: object
-                  properties:
-                    attachment:
-                      description: "The binary data object content."
-                      type: string
-                      format: binary
-                  required:
-                    - attachment
-      
               required:
                 - body
-                - files
       responses:
         200:
           description: "Success"
@@ -348,6 +337,11 @@ paths:
       responses:
         200:
           description: "Success. The data object is sent as a binary stream."
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
         500:
           description: "Error"
           content:
@@ -590,17 +584,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  proc_id:
-                    description: "The ID of the processor."
-                    type: string
-                    example: "1b362727cb0576d3079f91d73efaa7f8139a0e4751331fd0d28918ec1a9cd543"
-                  proc_descriptor:
-                    $ref: "#/components/schemas/proc_descriptor"    
-                required:
-                  - proc_id
-                  - proc_descriptori
+                type: array
+                items:
+                  type: object
+                  properties:
+                    proc_id:
+                      description: "The ID of the processor."
+                      type: string
+                      example: "1b362727cb0576d3079f91d73efaa7f8139a0e4751331fd0d28918ec1a9cd543"
+                    proc_descriptor:
+                      $ref: "#/components/schemas/proc_descriptor"    
+                  required:
+                    - proc_id
+                    - proc_descriptor
         500:
           description: "Error"
           content:
@@ -615,7 +611,7 @@ paths:
         which the RTI can use to access the remote machine. Deployment requires the RTI to access the GitHub repository that contains the
         processor. If the repository is not public, corresponding GitHub credentials need to be provided. Note that GitHub credentials
         are not stored. However, if specified, SSH credenitals will be retained by the RTI in order to access the remote machine which
-        hosts the deployed processor."
+        hosts the deployed processor. These credenitals would have to be encrypted using the public key of the node that is receiving this request."
       tags:
         - RTI (Runtime Infrastructure)
       parameters:
@@ -633,10 +629,22 @@ paths:
             schema:
               type: object
               properties:
+                deployment:
+                  type: string
+                  enum:
+                    - native
+                    - docker
                 ssh_credentials:
-                  $ref: "#/components/schemas/ssh_credentials"
+                  description: "Credentials encrypted using the public key of the node."
+                  type: string
                 github_credentials:
-                  $ref: "#/components/schemas/github_credentials"  
+                  description: "Credentials encrypted using the public key of the node."
+                  type: string
+                gpp_custodian:
+                  description: "ID of node that has the GPP for the processor. Error will be thrown if it is not found there."
+                  type: string
+              required:
+                - deployment
       responses:
         200:
           description: "Success"
@@ -739,7 +747,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/proc_descriptor"
+                $ref: "#/components/schemas/job_descriptor"
         500:
           description: "Error"
           content:
@@ -940,7 +948,6 @@ paths:
                   required:
                     - iid
                     - last_seen
-                    - rest_service_address
                     - p2p_service_address
                     - dor_service
                     - rti_service
@@ -1027,6 +1034,103 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/error"
+  
+  /api/v1/nodedb/provenance/{obj_id}:
+    get:
+      description: "Requests information the provenance of an object, which is effectively the whole ansestry history of the object.
+        This includes which processor created it and its input data objects, done recursively all the way to the origin data objects and processor.
+        It allows the node to keep track of all the steps needed to create the object and reproduce it when needed."
+      tags:
+        - NodeDB
+      parameters:
+        - in: path
+          description: "The id of the data object."
+          name: obj_id
+          schema:
+            type: string
+            example: "d3a37093c1086d1087cb8df01352c496108bda6fe0218f541ce73f2090b648e7"
+          required: true
+      responses:
+        200:
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content_nodes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        c_hash:
+                          description: "The SHA256 hash of the data object content."
+                          type: string
+                          example: "b4afb6192c6491b4491919944bf65c85ef003d873c2955696995cb4205479202"
+                        type:
+                          type: string
+                          enum:
+                            - original
+                            - derived
+                        data_type:
+                          description: "The type of the data object as understood in the context of a particular application. The SaaS
+                            Middleware supports a multitude of applications. What constitutes a valid data type can thus not be defined
+                            here but must be done so for each application. For example, in the application context of a 'Digital Urban
+                            Climate Twin', there may be data types such as 'DUCT.AHProfile' or 'DUCT.NearSurfaceClimateVariables'."
+                          type: string
+                          example: "DUCT.AHProfile"
+                        data_format:
+                          description: "The format of the data object. This may refer to the specific format or scheme used to encode
+                            the data object content. The purpose of this field is to provide information on how to decode or interpret
+                            the data object content. For example, commonly used data formats are 'json' or 'csv'. Data type and format
+                            should be considered together. For example, there can be data objects with the same data type but different
+                            data formats."
+                          type: string
+                          example: "hdf5"
+                      required:
+                        - c_hash
+                        - type
+                        - data_type
+                        - data_format
+                  proc_nodes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        gpp_hash:
+                          description: "The SHA256 hash of the GPP."
+                          type: string
+                        gpp:
+                          $ref: "#/components/schemas/git_processor_pointer"
+                      required:
+                        - gpp_hash
+                        - gpp
+                  steps:
+                    description: "Steps to create the selected object in order."
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        consume:
+                          description: "List of object ids that are inputs to the processor. Details of the objects can be referenced using these ids from the `content_nodes` property"
+                          type: array
+                          items:
+                            type: string
+                        processor:
+                          description: "ID of the processor used. Details of the processor can be referenced using its id from the `proc_nodes` property.s"
+                          type: string
+                        produce:
+                          description: "List of object ids that are outputs of the processor. Details of the objects can be referenced using these ids from the `content_nodes` property"
+                          type: string
+                      required:
+                        - consume
+                
+        500:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
 
 components:
   schemas:
@@ -1103,7 +1207,12 @@ components:
           description: "A list of tags (i.e., objects consisting of `key` and `value` elements)."
           example: [{'key': 'a', 'value': '123'}, {'key': 'b', 'value': '567'}]
         gpp:
-          $ref: "#/components/schemas/git_processor_pointer"
+          allOf:
+            - $ref: '#/components/schemas/git_processor_pointer'
+            - type: object
+              properties:
+                proc_descriptor:
+                  $ref: "#/components/schemas/proc_descriptor"
         recipe:
           $ref: "#/components/schemas/recipe"
       required:
@@ -1142,8 +1251,6 @@ components:
           description: "The configuration of the processor adapter that is to be used. Note, not all adapters support
             multiple configuration. Nevertheless, the name of the configuration has to be specified."
           example: "default"
-        proc_descriptor:
-          $ref: "#/components/schemas/proc_descriptor"
       required:
         - source
         - commit_id
@@ -1378,7 +1485,6 @@ components:
           description: "The output interface of the processor, i.e., an array of output items. Each item has
             a name and specifies the data object type and format that the processor will use for producing
             the output data object."
-          # $ref: "#/components/schemas/interface_item"
           type: array
           items:
             type: object
