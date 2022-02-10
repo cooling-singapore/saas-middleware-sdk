@@ -147,7 +147,7 @@ class EndpointProxy:
 
 
 class NodeDBProxy(EndpointProxy):
-    def __init__(self, remote_address):
+    def __init__(self, remote_address: (str, int)):
         EndpointProxy.__init__(self, db_endpoint_prefix, remote_address)
 
     def get_node(self) -> dict:
@@ -173,7 +173,7 @@ class NodeDBProxy(EndpointProxy):
 
 
 class DORProxy(EndpointProxy):
-    def __init__(self, remote_address):
+    def __init__(self, remote_address: (str, int)):
         EndpointProxy.__init__(self, dor_endpoint_prefix, remote_address)
 
     def search(self, patterns: list[str] = None, owner_iid: str = None,
