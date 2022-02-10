@@ -2,9 +2,9 @@ openapi: 3.0.0
 info:
   description: "This is the API specification for the SaaS Middleware.
 
-  ### Versioning\n
-  This API specification uses Semantic Versioning 2.0 (https://semver.org/spec/v2.0.0.html).
-  "
+    ### Versioning\n
+    This API specification uses Semantic Versioning 2.0 (https://semver.org/spec/v2.0.0.html).
+    "
   version: 1.0.0
   title: Simulation-as-a-Service (SaaS) Middleware API
 
@@ -12,14 +12,14 @@ paths:
   /api/v1/repository:
     get:
       description: "Searches a DOR for data objects that match the search criteria. Two kinds of criteria are
-      distinguished: constraints and patterns. Search constraints are conjunctive, i.e., all constraints have
-      to be matched in order for a data objective to be considered for inclusion in the search result. Constraints
-      can be used to only include data objects that match a given `owner_iid`, `data_type`, `data_format` or list of
-      `c_hashes`. After applying the search constraints, the result set is further filtered by the search patterns.
-      Unlike constraints, search patterns are disjunctive, i.e., so long as any pattern is matched, the data object
-      is included in the final result set. Search patterns are applied to the data object tags (key/value pair). A
-      search pattern is considered matched if it is a substring of either the key or value element of any of the data
-      object tags."
+        distinguished: constraints and patterns. Search constraints are conjunctive, i.e., all constraints have
+        to be matched in order for a data objective to be considered for inclusion in the search result. Constraints
+        can be used to only include data objects that match a given `owner_iid`, `data_type`, `data_format` or list of
+        `c_hashes`. After applying the search constraints, the result set is further filtered by the search patterns.
+        Unlike constraints, search patterns are disjunctive, i.e., so long as any pattern is matched, the data object
+        is included in the final result set. Search patterns are applied to the data object tags (key/value pair). A
+        search pattern is considered matched if it is a substring of either the key or value element of any of the data
+        object tags."
       tags:
         - DOR (Data Object Repository)
       requestBody:
@@ -54,7 +54,7 @@ paths:
                   items:
                     type: string
                   description: "A list of strings that needs to be contained by any of the tags in order for the data
-                  object to be included in the search result."
+                    object to be included in the search result."
                   example: "case_study"
       responses:
         200:
@@ -115,7 +115,7 @@ paths:
   /api/v1/repository/add:
     post:
       description: "Adds a new data object to the DOR and returns the meta information for this data object. The content of the 
-      data object itself is uploaded as an attachment (binary). There is no restriction as to the nature or size of the content."
+        data object itself is uploaded as an attachment (binary). There is no restriction as to the nature or size of the content."
       tags:
         - DOR (Data Object Repository)
       requestBody:
@@ -193,9 +193,9 @@ paths:
   /api/v1/repository/add-gpp:
     post:
       description: "Adds a new Git-Processor-Pointer (GPP) data object to the DOR and returns the meta information for this data object.
-      If the repository specified in the GPP information (see 'source' field) is private, valid GitHub credentials need to be provided. 
-      The DOR will use these credentials to access (i.e., clone) the repository. The credentials information will not be stored by the
-      DOR. It is not required to specify the `proc_descriptor` when adding a GPP to the DOR."
+        If the repository specified in the GPP information (see 'source' field) is private, valid GitHub credentials need to be provided. 
+        The DOR will use these credentials to access (i.e., clone) the repository. The credentials information will not be stored by the
+        DOR. It is not required to specify the `proc_descriptor` when adding a GPP to the DOR."
       tags:
         - DOR (Data Object Repository)
       requestBody:
@@ -260,7 +260,7 @@ paths:
   /api/v1/repository/{obj_id}:
     delete:
       description: "Deletes a data object from the DOR and returns the meta information of that data object. Authorisation required by the owner
-      of the data object."
+        of the data object."
       tags:
         - DOR (Data Object Repository)
       parameters:
@@ -611,11 +611,11 @@ paths:
   /api/v1/processor/{proc_id}:
     post:
       description: "Deploys a processor to the RTI. By default the processor is deployed on the same machine that
-      hosts the RTI. If the processor is supposed to be deployed on a remote machine, corresponding SSH credenitals have to be provided
-      which the RTI can use to access the remote machine. Deployment requires the RTI to access the GitHub repository that contains the
-      processor. If the repository is not public, corresponding GitHub credentials need to be provided. Note that GitHub credentials
-      are not stored. However, if specified, SSH credenitals will be retained by the RTI in order to access the remote machine which
-      hosts the deployed processor."
+        hosts the RTI. If the processor is supposed to be deployed on a remote machine, corresponding SSH credenitals have to be provided
+        which the RTI can use to access the remote machine. Deployment requires the RTI to access the GitHub repository that contains the
+        processor. If the repository is not public, corresponding GitHub credentials need to be provided. Note that GitHub credentials
+        are not stored. However, if specified, SSH credenitals will be retained by the RTI in order to access the remote machine which
+        hosts the deployed processor."
       tags:
         - RTI (Runtime Infrastructure)
       parameters:
@@ -800,8 +800,8 @@ paths:
                     $ref: "#/components/schemas/job_descriptor"
                   status:
                     description: "Status information about the job. The exact content is specific to the processor. However, status will always 
-                    include information about the `state` and the `progress` about the job. State can be any of the following: `initialised`, 
-                    `running`, `failed`, `successful`. Progress is indicated in percent."
+                      include information about the `state` and the `progress` about the job. State can be any of the following: `initialised`, 
+                      `running`, `failed`, `successful`. Progress is indicated in percent."
                     type: object
                     example: {
                       'progress': '20', 
@@ -821,18 +821,18 @@ paths:
   /api/v1/processor/permission/{req_id}:
     post:
       description: "Submits permissions for a specific request. When a processor needs to process an encrypted data object, it requires the
-      necessary permissions (and content key) to process the data object. For this purpose, the RTI will request the content key on the fly,
-      i.e., during the initialisation phase of a job, a request to the owners of encrypted data objects are created. Owners can then submit
-      the required content key using this endpoint. The request itself is encrypted using the public key of the data object owner and provides
-      the following information: 
-      `{\n
-        'type': 'request_content_key',\n
-        'req_id': 'H2dofbWhSZddTah9',\n
-        'obj_id': '1e6e ... f6be',\n
-        'ephemeral_public_key': 'MIIC ... Q==',\n
-        'user_iid': 'fyll ... ev00',\n
-        'node_id': '9mip ... x85y'\n
-      }`"
+        necessary permissions (and content key) to process the data object. For this purpose, the RTI will request the content key on the fly,
+        i.e., during the initialisation phase of a job, a request to the owners of encrypted data objects are created. Owners can then submit
+        the required content key using this endpoint. The request itself is encrypted using the public key of the data object owner and provides
+        the following information: 
+        `{\n
+          'type': 'request_content_key',\n
+          'req_id': 'H2dofbWhSZddTah9',\n
+          'obj_id': '1e6e ... f6be',\n
+          'ephemeral_public_key': 'MIIC ... Q==',\n
+          'user_iid': 'fyll ... ev00',\n
+          'node_id': '9mip ... x85y'\n
+        }`"
       tags:
         - RTI (Runtime Infrastructure)
       parameters:
@@ -852,21 +852,21 @@ paths:
               properties:
                 body:
                   description: "The protected content key for decrypting a specific data object. The content key is not submitted in plaintext.
-                  Instead the content key itself is encrypted using an ephemeral public key that is used for the purpose of this particular request
-                  only. Data object owners must ensure that any requests for content keys as well as the requesting entities (i.e., node identity) 
-                  is legit and can be trusted."
+                    Instead the content key itself is encrypted using an ephemeral public key that is used for the purpose of this particular request
+                    only. Data object owners must ensure that any requests for content keys as well as the requesting entities (i.e., node identity) 
+                    is legit and can be trusted."
                   type: string
                   example: "M5+dcVg6EhR8cG3btEHdntR/8oRQfi719I+28m103IT7YVvI/E0ydmW/XPOlPbvx
-                  S/av/2P0M4bklkwJBb+BRt5DJATAtmuKtXF+v5pdHTyYVHQUYOaffxuNatX6lf8m
-                  QuguLE47E5IYnHUo+MlTyUnbk6Fbq7sy24nUgVjV478scZSETBkjZprecZs47s8J
-                  JBs1zwblpDF21ps3alebKK5AdrE6u+I5/yK5fgl5xTMVOr/sXT14RZpbsc938jte
-                  M+wxlPw1Wk4ksGX7Ir6vr/c5TM8wNAB81FskF90ttLYA5rYrZbJ+ZPQ+SzVrJ6r4
-                  Oc7Bt25+WLaE5NdTxon5ZoGt0O6Li9zh6LbKz0vpuslLarsbpDhZeefJvfN+m5ER
-                  rw/k8IDlSc1QKW45OmfRqzJcs09jKQmq6rrq5cf0eu8aqXVtXK0Be33vy3T+0HFb
-                  cWHFyFpE5KBZvwCKpIPwk9jFk9zuUfTZCe5jQJytgBskm99SuqbsmuaYHHuZoub/
-                  70Nq4CUaSLhaL/7tPUxib++IKtehss8CffeWg8sTpFwT8DJK8LGxknF+B5xY715O
-                  x9YZ6xvhyUPAjP23Yo+5HFfgUB1eIJio9Zkc94l0u/EzrEnObNFhD2pDRJsGZJex
-                  Jha639W9nm1Cne5Jn1oNAA7jl7CR7BCGISigy/i1fZc="
+                    S/av/2P0M4bklkwJBb+BRt5DJATAtmuKtXF+v5pdHTyYVHQUYOaffxuNatX6lf8m
+                    QuguLE47E5IYnHUo+MlTyUnbk6Fbq7sy24nUgVjV478scZSETBkjZprecZs47s8J
+                    JBs1zwblpDF21ps3alebKK5AdrE6u+I5/yK5fgl5xTMVOr/sXT14RZpbsc938jte
+                    M+wxlPw1Wk4ksGX7Ir6vr/c5TM8wNAB81FskF90ttLYA5rYrZbJ+ZPQ+SzVrJ6r4
+                    Oc7Bt25+WLaE5NdTxon5ZoGt0O6Li9zh6LbKz0vpuslLarsbpDhZeefJvfN+m5ER
+                    rw/k8IDlSc1QKW45OmfRqzJcs09jKQmq6rrq5cf0eu8aqXVtXK0Be33vy3T+0HFb
+                    cWHFyFpE5KBZvwCKpIPwk9jFk9zuUfTZCe5jQJytgBskm99SuqbsmuaYHHuZoub/
+                    70Nq4CUaSLhaL/7tPUxib++IKtehss8CffeWg8sTpFwT8DJK8LGxknF+B5xY715O
+                    x9YZ6xvhyUPAjP23Yo+5HFfgUB1eIJio9Zkc94l0u/EzrEnObNFhD2pDRJsGZJex
+                    Jha639W9nm1Cne5Jn1oNAA7jl7CR7BCGISigy/i1fZc="
               required:
                 - body
       responses:
@@ -976,8 +976,8 @@ paths:
 
     post:
       description: "Submits information about an identity. The node verifies the identity information using the signature and eithers adds the identity
-      information to its database (if no information about this identity was known before) or updates its database records (if the identity information
-      is more recent than the one on record)."
+        information to its database (if no information about this identity was known before) or updates its database records (if the identity information
+        is more recent than the one on record)."
       tags:
         - NodeDB
       requestBody:
@@ -1033,15 +1033,15 @@ components:
     data_object_meta:
       title: Data Object Meta Information
       description: "Record of information about a data object, including the data type and format, the time the
-      data object has been created as well as who created it. Note that there is (currently) no limitations or
-      constraints as to what the values can be for the various fields (with exception of `created_t`). Instead, only
-      recommendations are provided here."
+        data object has been created as well as who created it. Note that there is (currently) no limitations or
+        constraints as to what the values can be for the various fields (with exception of `created_t`). Instead, only
+        recommendations are provided here."
       type: object
       properties:
         obj_id:
           description: "The id of the data object. It is calculated (using SHA256 hashing) when a data object is 
-          created by a DOR (e.g., when adding data to a DOR) based on the content hash (`c_hash`), data type, data 
-          format, creator name, time of creation, and a GPP hash (in case of a GPP data object)."
+            created by a DOR (e.g., when adding data to a DOR) based on the content hash (`c_hash`), data type, data 
+            format, creator name, time of creation, and a GPP hash (in case of a GPP data object)."
           type: string
           example: "3375ae0ba7910fe86158cd6396ba751f5f27bca3b821906f960b45fe1b5284fd"
         c_hash:
@@ -1055,33 +1055,33 @@ components:
           example: "32tm2i6ba6v7lw59tfduvldt8ofai40grxogy2k3hi4hnzt6do0zcwx9k3e23j9h"
         created_t:
           description: "A timestamp indicating when the data object has been created. The SaaS Middleware does not
-          (currently) impose any particular timestamp format or encoding so as long as it is a number. However, it is
-          recommended to use a commonly used encoding such as POSIX time (i.e., (time in milliseconds since the 
-          beginning of the epoch). Time of creation here refers to the time when the data object has been added to a
-          DOR."
+            (currently) impose any particular timestamp format or encoding so as long as it is a number. However, it is
+            recommended to use a commonly used encoding such as POSIX time (i.e., (time in milliseconds since the 
+            beginning of the epoch). Time of creation here refers to the time when the data object has been added to a
+            DOR."
           type: number
           example: 1643863677359
         created_by:
           type: string
           description: "A reference to who created the data object. The SaaS Middleware does not specify who qualifies
-          as creator of a data object. Furthermore, it is not specified if this field is a clear name, such as 'John
-          Doe', or using the ID of an identity. However, it is recommended to use references that are meaningful in the
-          application context. For example, in practice this could mean to use the ID of the identity that has added
-          the data object to the DOR."
+            as creator of a data object. Furthermore, it is not specified if this field is a clear name, such as 'John
+            Doe', or using the ID of an identity. However, it is recommended to use references that are meaningful in the
+            application context. For example, in practice this could mean to use the ID of the identity that has added
+            the data object to the DOR."
           example: "581e2571c6fa8ba01ba6456df4d1fe175abe952362ee925dc9396e67d7fbeeaf"
         data_type:
           description: "The type of the data object as understood in the context of a particular application. The SaaS
-          Middleware supports a multitude of applications. What constitutes a valid data type can thus not be defined
-          here but must be done so for each application. For example, in the application context of a 'Digital Urban
-          Climate Twin', there may be data types such as 'DUCT.AHProfile' or 'DUCT.NearSurfaceClimateVariables'."
+            Middleware supports a multitude of applications. What constitutes a valid data type can thus not be defined
+            here but must be done so for each application. For example, in the application context of a 'Digital Urban
+            Climate Twin', there may be data types such as 'DUCT.AHProfile' or 'DUCT.NearSurfaceClimateVariables'."
           type: string
           example: "DUCT.AHProfile"
         data_format:
           description: "The format of the data object. This may refer to the specific format or scheme used to encode
-          the data object content. The purpose of this field is to provide information on how to decode or interpret
-          the data object content. For example, commonly used data formats are 'json' or 'csv'. Data type and format
-          should be considered together. For example, there can be data objects with the same data type but different
-          data formats."
+            the data object content. The purpose of this field is to provide information on how to decode or interpret
+            the data object content. For example, commonly used data formats are 'json' or 'csv'. Data type and format
+            should be considered together. For example, there can be data objects with the same data type but different
+            data formats."
           type: string
           example: "hdf5"
         access_restricted:
@@ -1131,7 +1131,7 @@ components:
         commit_id:
           type: string
           description: "The specific commit id to be used. This allows to use specific versions of a processor adapter.
-          by instructing the DOR to checkout a specific commit."
+            by instructing the DOR to checkout a specific commit."
           example: "972bd54"
         proc_path:
           type: string
@@ -1140,7 +1140,7 @@ components:
         proc_config:
           type: string
           description: "The configuration of the processor adapter that is to be used. Note, not all adapters support
-          multiple configuration. Nevertheless, the name of the configuration has to be specified."
+            multiple configuration. Nevertheless, the name of the configuration has to be specified."
           example: "default"
         proc_descriptor:
           $ref: "#/components/schemas/proc_descriptor"
@@ -1189,11 +1189,11 @@ components:
     recipe:
       title: Recipe
       description: "Provides the necessary information to reproduce a data object. Processor consume a number of 
-      input data objects and produce some number of data objects. In principle, given the exact same input data
-      objects and the exact same processor, it should be possible to reproduce the exact same output data objects.
-      This assumes that the processor itself is deterministic. A recipe contains all the necessary information
-      in order to reproduce data objects. Recipes are automatically generated by the RTI. In general, recipes are 
-      not available for data objects that have been manually added to a DOR."
+        input data objects and produce some number of data objects. In principle, given the exact same input data
+        objects and the exact same processor, it should be possible to reproduce the exact same output data objects.
+        This assumes that the processor itself is deterministic. A recipe contains all the necessary information
+        in order to reproduce data objects. Recipes are automatically generated by the RTI. In general, recipes are 
+        not available for data objects that have been manually added to a DOR."
       type: object
       properties:
         processor:
@@ -1228,7 +1228,7 @@ components:
               type:
                 description: "The type of the input data object."
                 type: string
-                enum: [ "value", "reference"],
+                enum: [ "value", "reference"]
                 example: "reference"
               value:
                 description: "[type=='value'] The value of the input data object."
@@ -1248,7 +1248,7 @@ components:
           properties:
             name:
               description: "The name of the output data object. This refers to the name of the specific output of the processor's output interface 
-              that has produced this output data object."
+                that has produced this output data object."
               type: string
               example: "2m-climatic-variables"
             c_hash:
@@ -1301,37 +1301,37 @@ components:
     authorisation:
       title: Authorisation Message
       description: "Verifiable authorisation information needed for actions (REST call). The server will verify if the signature
-      has been generated by an identity authorised to perform the action. Note: only superficial information is provided here. The exact 
-      specification of the authorisation message and how to generate a valid authorisation message is explained elsewhere. For details, 
-      please refer to the implementation found in `saas.rest.request_manager.sign_authorisation_token()`."
+        has been generated by an identity authorised to perform the action. Note: only superficial information is provided here. The exact 
+        specification of the authorisation message and how to generate a valid authorisation message is explained elsewhere. For details, 
+        please refer to the implementation found in `saas.rest.request_manager.sign_authorisation_token()`."
       type: object
       properties:
         public_key:
           description: "The string encoded public key of the signing entity. This information is used to check if the signing entity is known
-          to the server. If not then the server may reject the request (depending on the nature of the request)."
+            to the server. If not then the server may reject the request (depending on the nature of the request)."
           type: string
           example: "MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAwMr9zfl+yb4/D747uxk7
-          DxTDmRc4ftwVLKvHBLwinu4cabkY/tyznMvAfOkkh157xQhVj/XQ8s24L8/6N+e3
-          XtYkoYpZ/ZF/68etDAUW6AIBGxmxwcTG2jqxyBRHXDorbhDqbLyhKBWYMb3fbUsx
-          dKqclCv25TPVTlEfEyfyNhfrvQMxj6HV9XXgKAorVivOsgJxWfWf+gcVJ3amJwYG
-          ZlgoDYAI4jUOKHDEeXNkxVZ5LxTvMPFcERhZr+kaRZwQT+BKmTKdFzNrzRdjhDeE
-          38SEMSp8GMHARYsKc+YZQMaSPwLyFEP9l6TFoVq6u7VFWlDNwD995V3ww9pqF2Ia
-          kaXbZB0b12wF/64wrXoYCWd76YnQYidaht9tyl78R/pIKEOiRbFxo2pvSC/FJUAI
-          6SSXFDj/gnZrmBRH2St3B5+BVL1Z9utAFoTNDN9kkNM6hyMAIcRmg5SbafNZt9MC
-          fA8G6YbHF81qbXBNrcup6W1dVZH5KL/W27cQkCFY6KUD18n4EfLc9S8h0K3PfJmm
-          YMFz9qa32cn6XdgYklxkias1akBHa4sAR1LDPBHyIfmFsb1+YY1y6Dk437LaTD9Z
-          X1Xzl4gufPMc4xH0d8a8m6+B2zJnsio3Yz1apRIGN04bXHz6Qq/qp7oFZvFotqDJ
-          2ers/Ary8qpxerUZtzhUql8CAwEAAQ=="
+            DxTDmRc4ftwVLKvHBLwinu4cabkY/tyznMvAfOkkh157xQhVj/XQ8s24L8/6N+e3
+            XtYkoYpZ/ZF/68etDAUW6AIBGxmxwcTG2jqxyBRHXDorbhDqbLyhKBWYMb3fbUsx
+            dKqclCv25TPVTlEfEyfyNhfrvQMxj6HV9XXgKAorVivOsgJxWfWf+gcVJ3amJwYG
+            ZlgoDYAI4jUOKHDEeXNkxVZ5LxTvMPFcERhZr+kaRZwQT+BKmTKdFzNrzRdjhDeE
+            38SEMSp8GMHARYsKc+YZQMaSPwLyFEP9l6TFoVq6u7VFWlDNwD995V3ww9pqF2Ia
+            kaXbZB0b12wF/64wrXoYCWd76YnQYidaht9tyl78R/pIKEOiRbFxo2pvSC/FJUAI
+            6SSXFDj/gnZrmBRH2St3B5+BVL1Z9utAFoTNDN9kkNM6hyMAIcRmg5SbafNZt9MC
+            fA8G6YbHF81qbXBNrcup6W1dVZH5KL/W27cQkCFY6KUD18n4EfLc9S8h0K3PfJmm
+            YMFz9qa32cn6XdgYklxkias1akBHa4sAR1LDPBHyIfmFsb1+YY1y6Dk437LaTD9Z
+            X1Xzl4gufPMc4xH0d8a8m6+B2zJnsio3Yz1apRIGN04bXHz6Qq/qp7oFZvFotqDJ
+            2ers/Ary8qpxerUZtzhUql8CAwEAAQ=="
         signature:
           description: "The signature created using the private key of the signing entity. The message that is being signed is an authorisation
-          token structured in the following way: `hash(hash(url) + [ hash(body) ] + hash(slot) + hash(public_key))`, whereby 'hash' refers to string
-          encoded SHA256, 'url' to the fully qualified URL of the request, 'body' to the optional JSON body of the request, 'slot' to the time slot 
-          when the request was created, 'public_key' to the string encoded public key of the signing entity, and '+' to string concatenation."
+            token structured in the following way: `hash(hash(url) + [ hash(body) ] + hash(slot) + hash(public_key))`, whereby 'hash' refers to string
+            encoded SHA256, 'url' to the fully qualified URL of the request, 'body' to the optional JSON body of the request, 'slot' to the time slot 
+            when the request was created, 'public_key' to the string encoded public key of the signing entity, and '+' to string concatenation."
           type: string
           example: "306502310080687d16402414829bbdaff2739896c5454831f125741eef640bec
-          0cfdf2332b86fa7c3097d9f9c4f25f34524694ae630230490dce6d98f5999d52
-          fa74eecdcd2dd762099e248d67d40369081929a0efe3b479e6b39c3c84076e0e
-          a9e7fd20f7bab7"
+            0cfdf2332b86fa7c3097d9f9c4f25f34524694ae630230490dce6d98f5999d52
+            fa74eecdcd2dd762099e248d67d40369081929a0efe3b479e6b39c3c84076e0e
+            a9e7fd20f7bab7"
       required:
         - public_key
         - signature
@@ -1347,8 +1347,8 @@ components:
           example: "test-proc"
         input:
           description: "The input interface of the processor, i.e., an array of input items. Each item has
-          a name and specifies the data object type and format that is accepted by the processor for
-          consuming the input data object."
+            a name and specifies the data object type and format that is accepted by the processor for
+            consuming the input data object."
           type: array
           items:
             type: object
@@ -1376,8 +1376,8 @@ components:
           example: {'name': 'x', 'data_format': 'json', 'data_type': 'JSONObject'}
         output:
           description: "The output interface of the processor, i.e., an array of output items. Each item has
-          a name and specifies the data object type and format that the processor will use for producing
-          the output data object."
+            a name and specifies the data object type and format that the processor will use for producing
+            the output data object."
           # $ref: "#/components/schemas/interface_item"
           type: array
           items:
@@ -1406,7 +1406,7 @@ components:
           example: {'name': 'y', 'data_format': 'json', 'data_type': 'JSONObject'}
         configuration:
           description: "A list of runtime configurations supported by this processor. This primarily affects the deployment and execution of processors. Depending on the
-          runtime environment, a corresponding configuration should be used."
+            runtime environment, a corresponding configuration should be used."
           type: array
           items:
             type: string
@@ -1420,9 +1420,9 @@ components:
     task_descriptor:
       title: Task Descriptor
       description: "Record of information about a task. This includes the ID of the processor that can execute
-      this task and the ID of the identity on whose behalf the task is supposed to be executed. In addition, inputs and outputs
-      need to be specified. Note that for each item in the processor's input/output interface specification, there needs to be
-      a corresponding item (with the same name) specified by the task descriptor."
+        this task and the ID of the identity on whose behalf the task is supposed to be executed. In addition, inputs and outputs
+        need to be specified. Note that for each item in the processor's input/output interface specification, there needs to be
+        a corresponding item (with the same name) specified by the task descriptor."
       type: object
       properties:
         processor_id:
@@ -1431,14 +1431,14 @@ components:
           example: "fb802ab36792263873ad168c3ff1eaf236d9df0847585cd50012ff0418787d9e"
         user_iid:
           description: "The ID of the identity on whose behalf the task is being executed. Note that this user needs to have the
-          access rights to all the input data objects in order to be executed."
+            access rights to all the input data objects in order to be executed."
           type: string
           example: "581e2571c6fa8ba01ba6456df4d1fe175abe952362ee925dc9396e67d7fbeeaf"
         input:
           type: array
           description: "Input data objects to be consumed by this task. Needs to match the specification of the input interface 
-          of the processor. In other words, for each input item specified by the input interface of the processor, there needs
-          to be an appropriate input data object with matching data type and format."
+            of the processor. In other words, for each input item specified by the input interface of the processor, there needs
+            to be an appropriate input data object with matching data type and format."
           items:
             type: object
             allOf:
@@ -1464,12 +1464,12 @@ components:
                         example: "ef1bde41ebd7bc58a6e68db2d3c49d33f999d67fcd0568b6fc7723363664e478"
                       user_signature:
                         description: "A signature created by the user to ensure that the entity who created this task is indeed
-                        the user (or more precisely: in possession of the user's private key) and thus acting on behalf of the 
-                        user. This is to avoid cases where someone provides a `user_iid` for this task without actually being in 
-                        control of the identity (i.e., pretending to be someone else who has permissions to access the data object).
-                        Note: signature verification is only done for data objects that have access restrictions, i.e., a (valid)
-                        signature is only need if access to a data object is restricted. Signature verification takes only place at
-                        the time of task, but not at the time a task is created or submitted to an RTI."
+                          the user (or more precisely: in possession of the user's private key) and thus acting on behalf of the 
+                          user. This is to avoid cases where someone provides a `user_iid` for this task without actually being in 
+                          control of the identity (i.e., pretending to be someone else who has permissions to access the data object).
+                          Note: signature verification is only done for data objects that have access restrictions, i.e., a (valid)
+                          signature is only need if access to a data object is restricted. Signature verification takes only place at
+                          the time of task, but not at the time a task is created or submitted to an RTI."
                     required:
                       - obj_id
                   - title: "Value"
@@ -1493,7 +1493,7 @@ components:
                 example: "output-1"
               owner_iid:
                 description: "The ID of the identity that will be assigned ownership for this data object."
-                type: iid
+                type: string
                 example: "581e2571c6fa8ba01ba6456df4d1fe175abe952362ee925dc9396e67d7fbeeaf"
               restricted_access:
                 description: "Indicates whether access to this data object should be restricted."
@@ -1503,9 +1503,9 @@ components:
                 type: boolean
               target_node_iid:
                 description: "The IID of the node whose DOR should be used to store this data object. If not specified,
-                the RTI will attempt to store the data object on the same node that executes the task. This
-                requires the node to also provide a DOR service which may not be the case in which case the task will
-                fail."
+                  the RTI will attempt to store the data object on the same node that executes the task. This
+                  requires the node to also provide a DOR service which may not be the case in which case the task will
+                  fail."
                 type: string
                 example: "581e2571c6fa8ba01ba6456df4d1fe175abe952362ee925dc9396e67d7fbeeaf"
             required:
@@ -1536,8 +1536,8 @@ components:
           $ref: "#/components/schemas/task_descriptor"
         retain:
           description: "Indicates if working/intermediate materials, created during job execution, are retained after job execution. Note that 
-          job retention is used primarily for testing and debugging purposes. There should be no need to retain working material of jobs
-          in a production RTI systems."
+            job retention is used primarily for testing and debugging purposes. There should be no need to retain working material of jobs
+            in a production RTI systems."
           type: boolean
           example: false
       required:
@@ -1603,38 +1603,38 @@ components:
           type: string
           description: "The public signing key. Can be used to verify signatures created by the identity."
           example: "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE2U87iJMpRORLgfhLXZBcwHMyZjccOGSU
-          HV3fZ79y7AvEBR+ey8K8s4/sf1+N+ULwRyp/K39LHDB31N7GJH56v2oZxcGo72jN
-          nbIVJSyQnET5JxJaeviVD0ZUvo/jlZeM"
+            HV3fZ79y7AvEBR+ey8K8s4/sf1+N+ULwRyp/K39LHDB31N7GJH56v2oZxcGo72jN
+            nbIVJSyQnET5JxJaeviVD0ZUvo/jlZeM"
         e_public_key:
           type: string
           description: "The public encryption key. Can be used to encrypt data intended for the identity only."
           example: "MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEApXdoOcYEDthunuebGvml
-          Y2GGfz0fAgyW8m3hXoHQlV6pRMpmplhQTCDjS2BA05a2YHZhunCaS1OEoaWvDzLh
-          x6R3Erd6ZS27zok9ZKLRLswBUtWIIV17sJRCPkAqddV6Mzimd6+6wT11lXGHWLsO
-          Dpx0z/nb1zAJ4mLHywiDr2k+wNMtrcp9n4vYj9wM1xjrkUx56NuTMPlQ8JVm0isN
-          xQMLel0e1Wqcz4+7kSU8Ighf3Bm5OOKkbXO/ICNC8whib7qCv4s+o+Qn5msWfsu1
-          I8BCFmzeuJhjbK1fvfyn9q8gqKBQEbzsIpKTC/bdyNpbCwabofgY/akx2w4Zeb5Q
-          5S7qcCLXZ8tTuuYKyYIQ0U+FTZD08360HLDsBU5i7KUzADU5cpWeg27RgxTwkyF/
-          4IcD9I8J13afK+DUu4Vo+M1osVvX154zFkNtSAEyNOzppQz7BKuoBxoazSqGIIUP
-          /Tgg7rAXkrRcDGGgHDTtQOqFPoC8PbtSoD7krK66G5A2+yXgpZfbvHnvzabqKwZQ
-          ixOw92k+ZWc2SG2jBATYtRaZDjbgyjSZ0w2aKRhvQiDn2cpMvwvlJD4zQD8l9R7V
-          P9Fp39iraCZIXImSmKYJq6p4ZJw6kEPnnk9rFg0vnTRcjBt3rq3fNTpdfuPU18tM
-          kB/rI0KZt9PfqgHOYo9qpEECAwEAAQ=="
+            Y2GGfz0fAgyW8m3hXoHQlV6pRMpmplhQTCDjS2BA05a2YHZhunCaS1OEoaWvDzLh
+            x6R3Erd6ZS27zok9ZKLRLswBUtWIIV17sJRCPkAqddV6Mzimd6+6wT11lXGHWLsO
+            Dpx0z/nb1zAJ4mLHywiDr2k+wNMtrcp9n4vYj9wM1xjrkUx56NuTMPlQ8JVm0isN
+            xQMLel0e1Wqcz4+7kSU8Ighf3Bm5OOKkbXO/ICNC8whib7qCv4s+o+Qn5msWfsu1
+            I8BCFmzeuJhjbK1fvfyn9q8gqKBQEbzsIpKTC/bdyNpbCwabofgY/akx2w4Zeb5Q
+            5S7qcCLXZ8tTuuYKyYIQ0U+FTZD08360HLDsBU5i7KUzADU5cpWeg27RgxTwkyF/
+            4IcD9I8J13afK+DUu4Vo+M1osVvX154zFkNtSAEyNOzppQz7BKuoBxoazSqGIIUP
+            /Tgg7rAXkrRcDGGgHDTtQOqFPoC8PbtSoD7krK66G5A2+yXgpZfbvHnvzabqKwZQ
+            ixOw92k+ZWc2SG2jBATYtRaZDjbgyjSZ0w2aKRhvQiDn2cpMvwvlJD4zQD8l9R7V
+            P9Fp39iraCZIXImSmKYJq6p4ZJw6kEPnnk9rFg0vnTRcjBt3rq3fNTpdfuPU18tM
+            kB/rI0KZt9PfqgHOYo9qpEECAwEAAQ=="
         nonce:
           type: number
           description: "A non-negative integer value that is increased by 1 every time the identity information is updated. The nonce is used
-          by the system to decide if a record is more recent than another."
+            by the system to decide if a record is more recent than another."
           example: 3
         signature:
           type: string
           description: "A signature that can be used to verify that the contents provided by this identity information record has been
-          provided by the entity that controls the identity's private key. Unless the private key has been lost/stolen, the information should be
-          considered as legit if the signature is valid. The NodeDB rejects idenitity updates with invalid signatures. Invalid records should thus
-          not be observed during normal operations."
+            provided by the entity that controls the identity's private key. Unless the private key has been lost/stolen, the information should be
+            considered as legit if the signature is valid. The NodeDB rejects idenitity updates with invalid signatures. Invalid records should thus
+            not be observed during normal operations."
           example: "3066023100ecfb8f728ee2ae59196e173a2f57bdf1015815917007b6dead5873
-          d803fe0953253baa83d7fc2dc2c81817a7e078c445023100d336a870cbe88847
-          3941be3e56c8ccf55dde8f39ae086d8ce673296e4a6692fb1ca8bcc279d0d173
-          4889592829c77fc7"
+            d803fe0953253baa83d7fc2dc2c81817a7e078c445023100d336a870cbe88847
+            3941be3e56c8ccf55dde8f39ae086d8ce673296e4a6692fb1ca8bcc279d0d173
+            4889592829c77fc7"
       required:
         - iid
         - name
