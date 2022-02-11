@@ -66,7 +66,7 @@ def upload_gpp_and_deploy_adapter(node_address: (str, int), user: Keystore) -> s
     # we are using a test processor which is located in a public Github repository. if a private repository
     # is used then it is necessary to provide Github credentials that are valid for this repo. such credentials
     # could be stored in the user's keystore.
-    github_asset: CredentialsAsset = keystore.get_asset('github-credentials')
+    github_asset: CredentialsAsset = user.get_asset('github-credentials')
     github_credentials: Optional[GithubCredentials] = github_asset.get(source) if github_asset is not None else None
     if github_credentials is not None:
         print(f"found Github credentials '{github_credentials.login}' for {source}.")
@@ -87,9 +87,9 @@ def upload_gpp_and_deploy_adapter(node_address: (str, int), user: Keystore) -> s
     # to take place on a remote machine (e.g., HPC cluster), then corresponding SSH credentials need to be provided
     # so the RTI can remotely login and install the processor there. similar to Github credentials, the SSH
     # credentials may be stored in the keystore.
-    rti = RTIProxy(address)
+    rti = RTIProxy(node_address)
     ssh_profile = 'some-name-used-to-identify-the-profile'
-    ssh_asset: CredentialsAsset = keystore.get_asset('ssh-credentials')
+    ssh_asset: CredentialsAsset = user.get_asset('ssh-credentials')
     ssh_credentials: Optional[SSHCredentials] = ssh_asset.get(ssh_profile) if ssh_asset is not None else None
     if ssh_credentials is not None:
         print(f"found SSH credentials '{ssh_credentials.login}' for '{ssh_profile}'.")
@@ -144,7 +144,7 @@ def submit_job(node_address: (str, int), proc_id: str, user: Keystore) -> (str, 
     # submitting the job is indeed in possession of the private key for the user on whose behalf the data object
     # is accessed. in short: to proof the entity has the rights to use the data object. of course, this also
     # requires that the data object owner has actually given access permissions to the user...
-    db = NodeDBProxy(address)
+    db = NodeDBProxy(node_address)
     rti_node_info = db.get_node()
     a_access_token = f"{rti_node_info['iid']}:{a_obj_id}"
     a_signature = user.sign(a_access_token.encode('utf-8'))
@@ -228,7 +228,7 @@ def clean_up(node_address: (str, int), proc_id: str, obj_ids: list[str], user: K
     dor.delete_data_object(proc_id, with_authorisation_by=user)
 
 
-if __name__ == '__main__':
+def main():
     """
     (1) Identity creation and publication
     The first thing that is needed when working with a SaaS Node is an identity. This identity will be used
@@ -239,7 +239,7 @@ if __name__ == '__main__':
     This includes private keys and other credentials (e.g., SSH or Github credentials) that may be required.
     The 'Identity' is the public facing part of an identity, including public keys and information about the
     identity such as name and email address. An 'Identity' objects is derived from a 'Keystore'. While Identity
-    can be shared freely, Keystore contents need to be kept safe (which is why parts of it is encrypted and 
+    can be shared freely, Keystore contents need to be kept safe (which is why parts of it is encrypted and
     password protected).
     """
     # create and publish a new identity...
@@ -291,3 +291,7 @@ if __name__ == '__main__':
     (6) Once we are done, we can clean up. Undeploy the processor and delete data objects
     """
     clean_up(address, proc_id, [a_obj_id, c_obj_id], keystore)
+
+
+if __name__ == '__main__':
+    main()
