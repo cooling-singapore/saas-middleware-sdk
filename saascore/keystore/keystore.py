@@ -11,12 +11,12 @@ from saascore.cryptography.eckeypair import ECKeyPair
 from saascore.cryptography.helpers import hash_json_object
 from saascore.cryptography.keypair import KeyPair
 from saascore.cryptography.rsakeypair import RSAKeyPair
-from saascore.helpers import generate_random_string, write_json_to_file
+from saascore.helpers import generate_random_string, write_json_to_file, read_json_from_file, validate_json
 from saascore.keystore.asset import Asset
 from saascore.keystore.assets.contentkeys import ContentKeysAsset
-from saascore.keystore.assets.credentials import CredentialsAsset
+from saascore.keystore.assets.credentials import CredentialsAsset, SSHCredentials, GithubCredentials
 from saascore.keystore.assets.keypair import KeyPairAsset, MasterKeyPairAsset
-from saascore.keystore.exceptions import KeystoreException
+from saascore.keystore.exceptions import KeystoreException, KeystoreCredentialsException
 from saascore.keystore.identity import Identity
 from saascore.keystore.schemas import SerializedKeystore, KeystoreObject
 from saascore.log import Logging
@@ -206,3 +206,121 @@ class Keystore:
 
         # update identity
         self._update_identity()
+
+
+credentials_schema = {
+    'type': 'object',
+    'properties': {
+        'email': {'type': 'string'},
+        'ssh-credentials': {
+            'type': 'array',
+            'items': {
+                'type': 'object',
+                'properties': {
+                    'name': {'type': 'string'},
+                    'login': {'type': 'string'},
+                    'host': {'type': 'string'},
+                    'password': {'type': 'string'},
+                    'key_path': {'type': 'string'}
+                },
+                'required': ['name', 'login', 'host']
+            }
+        },
+        'github-credentials': {
+            'type': 'array',
+            'items': {
+                'type': 'object',
+                'properties': {
+                    'repository': {'type': 'string'},
+                    'login': {'type': 'string'},
+                    'personal_access_token': {'type': 'string'}
+                },
+                'required': ['repository', 'login', 'personal_access_token']
+            }
+        }
+    }
+}
+
+
+def update_keystore_from_credentials(keystore: Keystore, credentials_path: str = None) -> None:
+    """
+    Updates a keystore with credentials loaded from credentials file. This is a convenience function useful for
+    testing purposes. A valid example content may look something like this:
+    {
+        "email": "john.doe@internet.com",
+        "ssh-credentials": [
+            {
+            "name": "my-remote-machine-A",
+            "login": "johnd",
+            "host": "10.8.0.1",
+            "password": "super-secure-password-123"
+            },
+            {
+            "name": "my-remote-machine-B",
+            "login": "johnd",
+            "host": "10.8.0.2",
+            "key-path": "/home/johndoe/machine-b-key"
+            }
+        ],
+        "github-credentials": [
+            {
+                "repository": "https://github.com/my-repo",
+                "login": "JohnDoe",
+                "personal_access_token": "ghp_xyz..."
+            }
+        ]
+    }
+
+    For SSH credentials note that you can either indicate a password or a path to a key file.
+
+    :param keystore: the keystore that is to be updated
+    :param credentials_path: the optional path to the credentials file (default is $HOME/.saas-credentials.json)
+    :return:
+    """
+
+    # load the credentials and validate
+    path = credentials_path if credentials_path else os.path.join(os.environ['HOME'], '.saas-credentials.json')
+    credentials = read_json_from_file(path)
+    if not validate_json(content=credentials, schema=credentials_schema):
+        raise KeystoreCredentialsException(path, credentials, credentials_schema)
+
+    # do we have an email?
+    if 'email' in credentials:
+        keystore.update_profile(email=credentials['email'])
+
+    # do we have SSH credentials?
+    if 'ssh-credentials' in credentials:
+        ssh_cred = CredentialsAsset[SSHCredentials].create('ssh-credentials', SSHCredentials)
+        for item in credentials['ssh-credentials']:
+            # password or key path?
+            if 'password' in item:
+                ssh_cred.update(item['name'], SSHCredentials(
+                    item['host'],
+                    item['login'],
+                    item['password'],
+                    False
+                ))
+            elif 'key_path' in item:
+                # read the ssh key from file
+                with open(item['key-path'], 'r') as f:
+                    ssh_key = f.read()
+                    ssh_cred.update(item['name'], SSHCredentials(
+                        item['host'],
+                        item['login'],
+                        ssh_key,
+                        False
+                    ))
+            else:
+                raise RuntimeError(f"Unexpected SSH credentials format: {item}")
+
+        keystore.update_asset(ssh_cred)
+
+    # do we have Github credentials?
+    if 'github-credentials' in credentials:
+        github_cred = CredentialsAsset[GithubCredentials].create('github-credentials', GithubCredentials)
+        for item in credentials['github-credentials']:
+            github_cred.update(item['repository'], GithubCredentials(
+                item['login'],
+                item['personal_access_token']
+            ))
+        keystore.update_asset(github_cred)
