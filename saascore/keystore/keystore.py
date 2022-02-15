@@ -247,6 +247,7 @@ def update_keystore_from_credentials(keystore: Keystore, credentials_path: str =
     Updates a keystore with credentials loaded from credentials file. This is a convenience function useful for
     testing purposes. A valid example content may look something like this:
     {
+        "name": "John Doe",
         "email": "john.doe@internet.com",
         "ssh-credentials": [
             {
@@ -284,9 +285,9 @@ def update_keystore_from_credentials(keystore: Keystore, credentials_path: str =
     if not validate_json(content=credentials, schema=credentials_schema):
         raise KeystoreCredentialsException(path, credentials, credentials_schema)
 
-    # do we have an email?
-    if 'email' in credentials:
-        keystore.update_profile(email=credentials['email'])
+    # update profile (if applicable)
+    keystore.update_profile(name=credentials['name'] if 'name' in credentials else None,
+                            email=credentials['email'] if 'email' in credentials else None)
 
     # do we have SSH credentials?
     if 'ssh-credentials' in credentials:
