@@ -300,7 +300,7 @@ def update_keystore_from_credentials(keystore: Keystore, credentials_path: str =
                     item['host'],
                     item['login'],
                     item['password'],
-                    False
+                    True
                 ))
             elif 'key_path' in item:
                 # read the ssh key from file
