@@ -316,7 +316,7 @@ def main():
     print(result)
 
     """
-    (6) Once we are done, we can clean up. Undeploy the processor and delete data objects
+    (7) Once we are done, we can clean up. Undeploy the processor and delete data objects
     """
     clean_up(address, proc_id, [a_obj_id, c_obj_id], keystore)
 
