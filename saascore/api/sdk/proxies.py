@@ -324,6 +324,9 @@ class RTIProxy(EndpointProxy):
     def get_descriptor(self, proc_id: str) -> dict:
         return self.get(f"/{proc_id}/descriptor")
 
+    def get_status(self, proc_id: str) -> dict:
+        return self.get(f"/{proc_id}/status")
+
     def submit_job(self, proc_id: str, job_input: list, job_output: list, user: Identity) -> dict:
         return self.post(f"/{proc_id}/jobs", body={
             'processor_id': proc_id,
