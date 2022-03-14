@@ -214,6 +214,18 @@ def retrieve_results(node_address: (str, int), job_id: str, user: Keystore, down
     return c_obj_id
 
 
+def tag_data_object(node_address: (str, int), obj_id: str, tags: dict, user: Keystore) -> None:
+    dor = DORProxy(node_address)
+    meta = dor.update_tags(obj_id, user, tags)
+    print(f"data object '{obj_id}' is now tagged which is reflected in the meta information: {meta}")
+
+
+def search(node_address: (str, int), patterns: list[str]) -> dict:
+    dor = DORProxy(node_address)
+    result = dor.search(patterns=patterns)
+    return result
+
+
 def clean_up(node_address: (str, int), proc_id: str, obj_ids: list[str], user: Keystore) -> None:
     # undeploy the processor
     rti = RTIProxy(node_address)
@@ -286,6 +298,22 @@ def main():
     # load the result
     c = read_json_from_file(download_path)
     print(c)
+
+    """
+    (6) Say you want to tag the resulting data object so it will be easier to find in the future.
+    """
+
+    # note that tags come in key:value fashion.
+    tag_data_object(address, c_obj_id, {
+        "description": "this is my first output data object.",
+        "project": "hello world"
+    }, keystore)
+
+    # once tagged, you can also search for data objects by using tags. patterns are matched against keys and
+    # values of tags. as long as a pattern is contained by at least one tag (key or value), the object is
+    # included in the result set.
+    result = search(address, ['hello world'])
+    print(result)
 
     """
     (6) Once we are done, we can clean up. Undeploy the processor and delete data objects
