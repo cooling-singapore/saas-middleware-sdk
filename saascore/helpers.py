@@ -24,10 +24,12 @@ def validate_json(content: dict, schema: dict) -> bool:
         jsonschema.validate(instance=content, schema=schema)
         return True
 
-    except jsonschema.exceptions.ValidationError:
+    except jsonschema.exceptions.ValidationError as e:
+        logger.error(e.message)
         return False
 
-    except jsonschema.exceptions.SchemaError:
+    except jsonschema.exceptions.SchemaError as e:
+        logger.error(e.message)
         return False
 
 
