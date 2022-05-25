@@ -261,7 +261,7 @@ def update_keystore_from_credentials(keystore: Keystore, credentials_path: str =
             "name": "my-remote-machine-B",
             "login": "johnd",
             "host": "10.8.0.2",
-            "key-path": "/home/johndoe/machine-b-key"
+            "key_path": "/home/johndoe/machine-b-key"
             }
         ],
         "github-credentials": [
@@ -304,14 +304,14 @@ def update_keystore_from_credentials(keystore: Keystore, credentials_path: str =
                 ))
             elif 'key_path' in item:
                 # read the ssh key from file
-                with open(item['key-path'], 'r') as f:
+                with open(item['key_path'], 'r') as f:
                     ssh_key = f.read()
-                    ssh_cred.update(item['name'], SSHCredentials(
-                        item['host'],
-                        item['login'],
-                        ssh_key,
-                        False
-                    ))
+                ssh_cred.update(item['name'], SSHCredentials(
+                    item['host'],
+                    item['login'],
+                    ssh_key,
+                    False
+                ))
             else:
                 raise RuntimeError(f"Unexpected SSH credentials format: {item}")
 
