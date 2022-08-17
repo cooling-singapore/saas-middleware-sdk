@@ -335,6 +335,9 @@ class RTIProxy(EndpointProxy):
             'user_iid': user.id
         })
 
+    def resume_job(self, proc_id: str, reconnect_info: dict) -> dict:
+        return self.post(f"/{proc_id}/jobs", body=reconnect_info)
+
     def get_jobs(self, proc_id: str) -> dict:
         return self.get(f"/{proc_id}/jobs")
 
