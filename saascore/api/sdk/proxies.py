@@ -335,12 +335,15 @@ class RTIProxy(EndpointProxy):
             'user_iid': user.id
         })
 
+    def resume_job(self, proc_id: str, reconnect_info: dict) -> dict:
+        return self.put(f"/{proc_id}/jobs", body=reconnect_info)
+
     def get_jobs(self, proc_id: str) -> dict:
         return self.get(f"/{proc_id}/jobs")
 
-    def get_job_info(self, job_id: str) -> (dict, dict):
+    def get_job_info(self, job_id: str) -> (dict, dict, dict):
         r = self.get(f"/job/{job_id}")
-        return r['job_descriptor'], r['status']
+        return r['job_descriptor'], r['status'], r['reconnect_info']
 
     def put_permission(self, req_id: str, permission: str) -> None:
         self.post(f"/permission/{req_id}", body=permission)

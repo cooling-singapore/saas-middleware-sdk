@@ -31,5 +31,10 @@ class RTIServiceNotSupportedError(SaaSException):
 
 
 class RunCommandError(SaaSException):
+    def __init__(self, details: dict, reason: str = 'Error while running command') -> None:
+        super().__init__(reason, details=details)
+
+
+class RunCommandTimeoutError(RunCommandError):
     def __init__(self, details: dict) -> None:
-        super().__init__('Error while running command', details=details)
+        super().__init__(details=details, reason='Timeout while running command')
