@@ -16,6 +16,7 @@ def function(working_directory):
         a = a['v']
     print(f"a={a}")
     print(f"trigger:progress:10")
+    sys.stdout.flush()
 
     b_path = os.path.join(working_directory, 'b')
     with open(b_path, 'r') as f:
@@ -23,6 +24,7 @@ def function(working_directory):
         b = b['v']
     print(f"b={b}")
     print(f"trigger:progress:20")
+    sys.stdout.flush()
 
     # calculate the result
     c = {
@@ -30,6 +32,7 @@ def function(working_directory):
     }
     print(f"c={c}")
     print(f"trigger:progress:30")
+    sys.stdout.flush()
 
     # simply wait for a while...
     parameters_path = os.path.join(working_directory, 'parameters')
@@ -43,8 +46,10 @@ def function(working_directory):
         json.dump(c, f, indent=4, sort_keys=True)
     print(f"trigger:progress:90")
     print(f"trigger:output:c")
+    sys.stdout.flush()
 
     print(f"trigger:progress:100")
+    sys.stdout.flush()
 
 
 if __name__ == '__main__':
