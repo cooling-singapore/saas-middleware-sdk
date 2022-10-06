@@ -1,10 +1,12 @@
+import os
 import json
 from typing import Union, Optional
 
 import requests
 
-from saascore.api.sdk.exceptions import UnexpectedContentType, UnsuccessfulConnectionError
-from saascore.api.sdk.helpers import extract_response, sign_authorisation_token
+from saascore.api.sdk.exceptions import UnexpectedHTTPError, UnexpectedContentType, UnsuccessfulConnectionError, \
+    UnsuccessfulRequestError
+from saascore.api.sdk.helpers import generate_authorisation_token
 from saascore.keystore.assets.credentials import GithubCredentials, SSHCredentials
 from saascore.keystore.identity import Identity
 from saascore.keystore.keystore import Keystore
@@ -12,6 +14,30 @@ from saascore.keystore.keystore import Keystore
 db_endpoint_prefix = "/api/v1/db"
 dor_endpoint_prefix = "/api/v1/dor"
 rti_endpoint_prefix = "/api/v1/rti"
+
+
+def extract_response(response: requests.Response) -> Optional[Union[dict, list]]:
+    """
+    Extracts the response content in case of an 'Ok' response envelope or raises an exception in case
+    of an 'Error' envelope.
+    :param response: the response message
+    :return: extracted response content (if any)
+    :raise UnsuccessfulRequestError
+    """
+
+    if response.status_code == 200:
+        return response.json()
+
+    elif response.status_code == 500:
+        content = response.json()
+        raise UnsuccessfulRequestError(
+            content['reason'], content['id'], content['details'] if 'details' in content else None
+        )
+
+    else:
+        raise UnexpectedHTTPError({
+            'response': response
+        })
 
 
 class EndpointProxy:
@@ -26,18 +52,17 @@ class EndpointProxy:
     def get(self, endpoint: str, body: Union[dict, list] = None, parameters: dict = None, download_path: str = None,
             with_authorisation_by: Keystore = None) -> Optional[Union[dict, list]]:
 
-        content = self._make_content(endpoint, 'GET', parameters=parameters, body=body,
-                                     with_authorisation_by=with_authorisation_by)
-
-        url = self._url(endpoint, parameters)
         try:
+            url = self._make_url(endpoint, parameters)
+            headers = self._make_headers(with_authorisation_by, f"GET:{url}", body) if with_authorisation_by else {}
+
             if download_path:
-                with requests.get(url, data=content, stream=True) as response:
-                    header = {k: v for k, v in response.headers.items()}
-                    if header['Content-Type'] == 'application/json':
+                with requests.get(url, headers=headers, data=body, stream=True) as response:
+                    header = {k.lower(): v for k, v in response.headers.items()}
+                    if header['content-type'] == 'application/json':
                         return extract_response(response)
 
-                    elif response.headers['Content-Type'] == 'application/octet-stream':
+                    elif response.headers['content-type'] == 'application/octet-stream':
                         content = response.iter_content(chunk_size=8192)
                         with open(download_path, 'wb') as f:
                             for chunk in content:
@@ -50,7 +75,7 @@ class EndpointProxy:
                         })
 
             else:
-                response = requests.get(url, data=content)
+                response = requests.get(url, headers=headers, json=body)
                 return extract_response(response)
 
         except requests.exceptions.ConnectionError:
@@ -59,18 +84,18 @@ class EndpointProxy:
     def put(self, endpoint: str, body: Union[dict, list] = None, parameters: dict = None, attachment_path: str = None,
             with_authorisation_by: Keystore = None) -> Union[dict, list]:
 
-        content = self._make_content(endpoint, 'PUT', parameters=parameters, body=body,
-                                     with_authorisation_by=with_authorisation_by)
-
-        url = self._url(endpoint, parameters)
         try:
+            url = self._make_url(endpoint, parameters)
+            headers = self._make_headers(with_authorisation_by, f"PUT:{url}", body) if with_authorisation_by else {}
+
             if attachment_path:
-                with open(attachment_path, 'rb') as f:
-                    response = requests.put(url, data=content, files={'attachment': f.read()})
-                    return extract_response(response)
+                response = requests.post(url,
+                                         data={'body': json.dumps(body)},
+                                         files={'attachment': open(attachment_path, 'rb')})
+                return extract_response(response)
 
             else:
-                response = requests.put(url, data=content)
+                response = requests.put(url, headers=headers, json=body)
                 return extract_response(response)
 
         except requests.exceptions.ConnectionError:
@@ -79,20 +104,19 @@ class EndpointProxy:
     def post(self, endpoint: str, body: Union[dict, list, str] = None, parameters: dict = None,
              attachment_path: str = None, with_authorisation_by: Keystore = None) -> Union[dict, list]:
 
-        content = self._make_content(endpoint, 'POST',
-                                     parameters=parameters,
-                                     body=body,
-                                     with_authorisation_by=with_authorisation_by)
-
-        url = self._url(endpoint, parameters)
         try:
+            url = self._make_url(endpoint, parameters)
+            headers = self._make_headers(with_authorisation_by, f"POST:{url}", body) if with_authorisation_by else {}
+
             if attachment_path:
                 with open(attachment_path, 'rb') as f:
-                    response = requests.post(url, data=content, files={'attachment': f.read()})
+                    response = requests.post(url,
+                                             data={'body': json.dumps(body)},
+                                             files={'attachment': f})
                     return extract_response(response)
 
             else:
-                response = requests.post(url, data=content)
+                response = requests.post(url, headers=headers, json=body)
                 return extract_response(response)
 
         except requests.exceptions.ConnectionError:
@@ -101,49 +125,29 @@ class EndpointProxy:
     def delete(self, endpoint: str, body: Union[dict, list] = None, parameters: dict = None,
                with_authorisation_by: Keystore = None) -> Union[dict, list]:
 
-        content = self._make_content(endpoint, 'DELETE',
-                                     parameters=parameters,
-                                     body=body,
-                                     with_authorisation_by=with_authorisation_by)
-
-        url = self._url(endpoint, parameters)
         try:
-            response = requests.delete(url, data=content)
+            url = self._make_url(endpoint, parameters)
+            headers = self._make_headers(with_authorisation_by, f"DELETE:{url}", body) if with_authorisation_by else {}
+
+            response = requests.delete(url, headers=headers, json=body)
             return extract_response(response)
 
         except requests.exceptions.ConnectionError:
             raise UnsuccessfulConnectionError(url)
 
-    def _auth_url(self, endpoint: str, parameters: dict = None) -> str:
-        url = f"{self._endpoint_prefix}{endpoint}"
-
+    def _make_url(self, endpoint: str, parameters: dict = None) -> str:
+        url =  f"http://{self._remote_address[0]}:{self._remote_address[1]}{self._endpoint_prefix}{endpoint}"
         if parameters:
             for i in range(len(parameters)):
                 url += '?' if i == 0 else '&'
                 url += parameters[i][0] + '=' + parameters[i][1]
-
         return url
 
-    def _url(self, endpoint: str, parameters: dict = None) -> str:
-        return f"http://{self._remote_address[0]}:{self._remote_address[1]}{self._auth_url(endpoint, parameters)}"
-
-    def _make_content(self, endpoint: str, action: str, parameters: dict = None, body: Union[dict, list] = None,
-                      with_authorisation_by: Keystore = None):
-        content = {}
-
-        if body:
-            content['body'] = json.dumps(body)
-
-        if with_authorisation_by:
-            url = f"{action}:{self._auth_url(endpoint, parameters)}"
-            authorisation = {
-                    'public_key': with_authorisation_by.signing_key.public_as_string(),
-                    'signature': sign_authorisation_token(with_authorisation_by, url, body)
-            }
-
-            content['authorisation'] = json.dumps(authorisation)
-
-        return content
+    def _make_headers(self, authority: Keystore, url: str, body: Union[dict, list] = None) -> Optional[dict]:
+        return {
+            'saasauth-iid': authority.identity.id,
+            'saasauth-signature': generate_authorisation_token(authority, url, body)
+        }
 
 
 class NodeDBProxy(EndpointProxy):
@@ -165,8 +169,9 @@ class NodeDBProxy(EndpointProxy):
         serialised_identity = self.get(f"/identity/{iid}")
         return Identity.deserialise(serialised_identity) if serialised_identity else None
 
-    def update_identity(self, identity) -> None:
-        self.post('/identity', body=identity.serialise())
+    def update_identity(self, identity) -> Optional[Identity]:
+        serialised_identity = self.post('/identity', body=identity.serialise())
+        return Identity.deserialise(serialised_identity) if serialised_identity else None
 
     def get_provenance(self, obj_id: str) -> dict:
         return self.get(f"/provenance/{obj_id}")
@@ -243,10 +248,10 @@ class DORProxy(EndpointProxy):
 
         return self.post('/add-gpp', body=body)
 
-    def delete_data_object(self, obj_id: str, with_authorisation_by: Keystore) -> (str, dict):
+    def delete_data_object(self, obj_id: str, with_authorisation_by: Keystore) -> dict:
         return self.delete(f"/{obj_id}", with_authorisation_by=with_authorisation_by)
 
-    def get_meta(self, obj_id: str) -> (str, dict):
+    def get_meta(self, obj_id: str) -> Optional[dict]:
         return self.get(f"/{obj_id}/meta")
 
     def get_content(self, obj_id: str, with_authorisation_by: Keystore, download_path: str) -> dict:
@@ -316,19 +321,19 @@ class RTIProxy(EndpointProxy):
                 })
                 body['github_credentials'] = peer.encrypt(github_credentials_serialised.encode('utf-8')).hex()
 
-        return self.post(f"/{proc_id}", body=body)
+        return self.post(f"/proc/{proc_id}", body=body)
 
     def undeploy(self, proc_id: str) -> dict:
-        return self.delete(f"/{proc_id}")
+        return self.delete(f"/proc/{proc_id}")
 
     def get_descriptor(self, proc_id: str) -> dict:
-        return self.get(f"/{proc_id}/descriptor")
+        return self.get(f"/proc/{proc_id}/descriptor")
 
     def get_status(self, proc_id: str) -> dict:
-        return self.get(f"/{proc_id}/status")
+        return self.get(f"/proc/{proc_id}/status")
 
     def submit_job(self, proc_id: str, job_input: list, job_output: list, user: Identity) -> dict:
-        return self.post(f"/{proc_id}/jobs", body={
+        return self.post(f"/proc/{proc_id}/jobs", body={
             'processor_id': proc_id,
             'input': job_input,
             'output': job_output,
@@ -336,14 +341,17 @@ class RTIProxy(EndpointProxy):
         })
 
     def resume_job(self, proc_id: str, reconnect_info: dict) -> dict:
-        return self.put(f"/{proc_id}/jobs", body=reconnect_info)
+        return self.put(f"/proc/{proc_id}/jobs", body=reconnect_info)
 
     def get_jobs(self, proc_id: str) -> dict:
-        return self.get(f"/{proc_id}/jobs")
+        return self.get(f"/proc/{proc_id}/jobs")
 
     def get_job_info(self, job_id: str) -> (dict, dict, dict):
         r = self.get(f"/job/{job_id}")
         return r['job_descriptor'], r['status'], r['reconnect_info']
 
-    def put_permission(self, req_id: str, permission: str) -> None:
-        self.post(f"/permission/{req_id}", body=permission)
+    def put_permission(self, req_id: str, content_key: str) -> None:
+        self.post(f"/permission/{req_id}", body={
+            'req_id': req_id,
+            'content_key': content_key
+        })
