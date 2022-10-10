@@ -54,6 +54,10 @@ def upload_gpp_and_deploy_adapter(node_address: (str, int), user: Keystore) -> s
     if not node_info.rti_service:
         raise RuntimeError("Sorry this node doesn't support RTI services...")
 
+    # check if the node uses strict deployment
+    if node_info.strict_deployment:
+        raise RuntimeError("Sorry this node uses strict deployment rules and cannot be used for this example app...")
+
     # all things data objects require to use a DOR service. let's check if the node supports it. btw, RTI and
     # DOR services do not have to be on the same node. you could have multiple nodes in your network supporting
     # both or only one or the other.
@@ -273,11 +277,10 @@ def main():
     keystore = Keystore.load(os.path.join(directory, f"{keystore_id}.json"), pwd)
 
     """
-    (2) Deploying a processor (NOTE: this only works if the keystore is the same that has been used to start the
-    node.)
-    Before deploying a processor on a node's RTI, you need to upload a corresponding Github-Processor-Pointer
-    (GPP) data object which contains the necessary details where to find the code of the processor's SaaS adapter.
-    Note that only nodes that support RTI services can be used to deploy adapters.
+    (2) Deploying a processor (NOTE: if the node uses strict deployment rules, this only works if the keystore is 
+    the same that has been used to start the node). Before deploying a processor on a node's RTI, you need to upload a 
+    corresponding Github-Processor-Pointer (GPP) data object which contains the necessary details where to find the 
+    code of the processor's SaaS adapter. Note that only nodes that support RTI services can be used to deploy adapters.
     """
     proc_id = upload_gpp_and_deploy_adapter(address, keystore)
     print(f"id of the deployed processor: {proc_id}")
@@ -319,8 +322,8 @@ def main():
 
     # note that tags come in key:value fashion.
     tag_data_object(address, c_obj_id, [
-        DataObject.Tag(name='description', value='this is my first output data object.'),
-        DataObject.Tag(name='contact', value={
+        DataObject.Tag(key='description', value='this is my first output data object.'),
+        DataObject.Tag(key='contact', value={
             'name': 'Foo Bar',
             'contact': 'foo.bar@internet.com'
         })
