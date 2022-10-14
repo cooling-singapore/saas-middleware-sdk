@@ -16,7 +16,7 @@ def function(working_directory):
         a = a['v']
     print(f"a={a}")
     print(f"trigger:progress:20")
-    time.sleep(0.2)
+    time.sleep(a)
 
     b_path = os.path.join(working_directory, 'b')
     with open(b_path, 'r') as f:
@@ -24,7 +24,7 @@ def function(working_directory):
         b = b['v']
     print(f"b={b}")
     print(f"trigger:progress:40")
-    time.sleep(0.2)
+    time.sleep(b)
 
     c = {
         'v': a + b
