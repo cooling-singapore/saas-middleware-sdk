@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import abc
+import os
+import threading
+import time
 from threading import Lock
-from typing import List, Union
+from typing import List, Union, Dict
 
 import uvicorn
 from fastapi import FastAPI, Request, Depends, HTTPException, status
@@ -69,10 +72,12 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
 
 
 class Application(abc.ABC):
-    def __init__(self, address: (str, int), endpoint_prefix: str, wd_path: str, title: str, version: str,
-                 description: str) -> None:
+    def __init__(self, address: (str, int), node_address: (str, int), endpoint_prefix: str, wd_path: str,
+                 title: str, version: str, description: str, context_expiry: int = 30) -> None:
 
+        self._mutex = Lock()
         self._address = address
+        self._node_address = node_address
         self._endpoint_prefix = endpoint_prefix
         self._wd_path = wd_path
         self._title = title
@@ -82,6 +87,14 @@ class Application(abc.ABC):
         self._mutex = Lock()
         self._api = FastAPI()
         self._thread = None
+
+        self._context: Dict[str, SDKContext] = {}
+
+        self._invalidate_thread = threading.Thread(target=self._invalidate_contexts,
+                                                   args=(context_expiry,),
+                                                   daemon=True)
+        self._invalidate_thread.start()
+
 
     def _register(self, endpoint: EndpointDefinition) -> None:
         route = f"{endpoint.prefix}/{endpoint.rule}"
@@ -108,6 +121,24 @@ class Application(abc.ABC):
                              description=endpoint.function.__doc__)(endpoint.function)
         else:
             raise UnsupportedRESTMethod(endpoint.method, route)
+
+    def _invalidate_contexts(self, expiry: int) -> None:
+        logger.debug(f"[context_invalidator] invalidating contexts after {expiry} minutes.")
+        while True:
+            time.sleep(30)
+            with self._mutex:
+                for key in list(self._context.keys()):
+                    context = self._context[key]
+                    if context.age > expiry:
+                        logger.debug(f"[context_invalidator] context expired: {context.user}")
+                        self._context.pop(key)
+
+    def _get_context(self, user: User) -> SDKContext:
+        with self._mutex:
+            if user.username not in self._context:
+                logger.debug(f"[context_invalidator] context created: {user.username}")
+                self._context[user.username] = connect(self._node_address, user.keystore)
+            return self._context[user.username]
 
     async def _close(self) -> None:
         logger.info(f"REST app is shutting down.")
