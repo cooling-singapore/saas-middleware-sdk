@@ -12,3 +12,5 @@ SQLAlchemy~=1.4.41
 python-multipart
 python-jose[cryptography]
 bcrypt
+python-snappy
+numpy~=1.23.4
