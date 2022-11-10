@@ -81,10 +81,12 @@ class Application(abc.ABC):
         self._address = address
         self._node_address = node_address
         self._endpoint_prefix = endpoint_prefix
-        self._wd_path = wd_path
         self._title = title
         self._version = version
         self._description = description
+
+        self._wd_path = wd_path
+        os.makedirs(os.path.join(self._wd_path), exist_ok=True)
 
         self._mutex = Lock()
         self._api = FastAPI()

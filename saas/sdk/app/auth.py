@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from jose import jwt
 
 from saas.core.helpers import generate_random_string
+from saas.core.identity import Identity
 from saas.core.keystore import Keystore
 from saas.rest.schemas import Token
 from saas.sdk.app.exceptions import AppRuntimeError
@@ -39,6 +40,10 @@ class User(BaseModel):
     disabled: bool
     hashed_password: str
     keystore: Keystore
+
+    @property
+    def identity(self) -> Identity:
+        return self.keystore.identity
 
 
 class UserDB:
@@ -82,7 +87,7 @@ class UserDB:
                 return None
 
     @classmethod
-    def add_user(cls, username: str, name: str, email: str, password: str):
+    def add_user(cls, username: str, name: str, email: str, password: str) -> User:
         with cls._Session() as session:
             # check if this username already exists
             record = session.query(UserRecord).get(username)
@@ -96,10 +101,22 @@ class UserDB:
             keystore = Keystore.create(cls._keystore_path, name, email, keystore_password)
 
             # add new user (with a randomly generated password)
-            session.add(UserRecord(username=username, name=name, email=email, disabled=False,
+            disabled = False
+            hashed_password = UserAuth.get_password_hash(password)
+            session.add(UserRecord(username=username, name=name, email=email, disabled=disabled,
                                    keystore_id=keystore.identity.id, keystore_password=keystore_password,
-                                   hashed_password=UserAuth.get_password_hash(password)))
+                                   hashed_password=hashed_password))
             session.commit()
+
+            # read the record and return the user
+            return User(
+                username=username,
+                name=name,
+                email=email,
+                disabled=disabled,
+                hashed_password=hashed_password,
+                keystore=keystore
+            )
 
 
 class UserAuth:

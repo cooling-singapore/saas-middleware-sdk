@@ -118,7 +118,7 @@ class EndpointProxy:
 
         try:
             if download_path:
-                with requests.get(url, headers=headers, data=body, stream=True) as response:
+                with requests.get(url, headers=headers, json=body, stream=True) as response:
                     header = {k.lower(): v for k, v in response.headers.items()}
                     if header['content-type'] == 'application/json':
                         return extract_response(response)

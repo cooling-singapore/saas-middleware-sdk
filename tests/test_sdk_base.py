@@ -6,7 +6,7 @@ import unittest
 from saas.core.exceptions import SaaSRuntimeException
 from saas.core.keystore import Keystore
 from saas.dor.schemas import DataObject
-from saas.sdk.base import SaaS
+from saas.sdk.base import connect, SDKGPPDataObject
 from saas.sdk.helper import create_wd, generate_random_file
 
 
@@ -35,17 +35,17 @@ class SDKBaseTestCase(unittest.TestCase):
     def test_context(self):
         # try wrong address
         try:
-            SaaS.connect(('127.0.0.1', 9999), self._keystore)
+            connect(('127.0.0.1', 9999), self._keystore)
             assert False
 
         except SaaSRuntimeException as e:
             assert("Cannot establish connection" in e.reason)
 
-        context = SaaS.connect(self._node_address, self._keystore)
+        context = connect(self._node_address, self._keystore)
         assert(context is not None)
 
     def test_upload_gpp_delete(self):
-        context = SaaS.connect(self._node_address, self._keystore)
+        context = connect(self._node_address, self._keystore)
 
         # upload test processor
         source = 'https://github.com/cooling-singapore/saas-processor-template'
@@ -61,7 +61,7 @@ class SDKBaseTestCase(unittest.TestCase):
         # search for it (correct id)
         result = context.find_data_object(obj.meta.obj_id)
         assert(result is not None)
-        assert(isinstance(result, SaaS.GPPDataObject))
+        assert(isinstance(result, SDKGPPDataObject))
 
         # delete the object
         obj.delete()
@@ -71,7 +71,7 @@ class SDKBaseTestCase(unittest.TestCase):
         assert(result is None)
 
     def test_upload_content_access_tags_ownership_delete(self):
-        context = SaaS.connect(self._node_address, self._keystore)
+        context = connect(self._node_address, self._keystore)
 
         # generate file with random content
         content_path = os.path.join(self._wd_path, 'content.dat')
@@ -91,7 +91,7 @@ class SDKBaseTestCase(unittest.TestCase):
         assert('k' not in obj.meta.tags)
 
         # download content (should not work)
-        context2 = SaaS.connect(self._node_address, self._known_user)
+        context2 = connect(self._node_address, self._known_user)
         obj2 = context2.find_data_object(obj.meta.obj_id)
         try:
             obj2.download(self._wd_path)
@@ -106,7 +106,7 @@ class SDKBaseTestCase(unittest.TestCase):
         assert(self._known_user.identity.id in obj.meta.access)
 
         # download content (should work)
-        context2 = SaaS.connect(self._node_address, self._known_user)
+        context2 = connect(self._node_address, self._known_user)
         obj2 = context2.find_data_object(obj.meta.obj_id)
         try:
             obj2.download(self._wd_path)
@@ -137,7 +137,7 @@ class SDKBaseTestCase(unittest.TestCase):
             assert False
 
     def test_deploy_execute_provenance(self):
-        context = SaaS.connect(self._node_address, self._keystore)
+        context = connect(self._node_address, self._keystore)
 
         # upload test GPP
         source = 'https://github.com/cooling-singapore/saas-processor-template'
@@ -154,7 +154,7 @@ class SDKBaseTestCase(unittest.TestCase):
         proc = obj.deploy(rti)
 
         # find the processor
-        proc = context.find_processor(proc.descriptor.proc_id)
+        proc = context.find_processor_by_id(proc.descriptor.proc_id)
         assert(proc is not None)
 
         # find all processors
@@ -169,7 +169,7 @@ class SDKBaseTestCase(unittest.TestCase):
         print(status)
 
         # execute a job
-        output = proc.execute({
+        output = proc.submit_and_wait({
             'a': {'v': 1},
             'b': {'v': 2}
         })
@@ -177,11 +177,12 @@ class SDKBaseTestCase(unittest.TestCase):
 
         # download 'c'
         c = output['c']
-        path = c.download(self._wd_path, 'c')
-        assert(os.path.isfile(path))
+        download_path = os.path.join(self._wd_path, 'c')
+        c.download(download_path)
+        assert(os.path.isfile(download_path))
 
         # analyse file content
-        with open(path, 'r') as f:
+        with open(download_path, 'r') as f:
             content = json.load(f)
             assert('v' in content)
 

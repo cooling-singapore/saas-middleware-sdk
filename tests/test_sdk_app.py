@@ -19,8 +19,8 @@ class TestResponse(BaseModel):
 
 
 class TestApp(Application):
-    def __init__(self, address: (str, int), wd_path: str, endpoint_prefix: str):
-        super().__init__(address, endpoint_prefix, wd_path, 'Test App', 'v0.0.1', 'This is a test app')
+    def __init__(self, address: (str, int), node_address: (str, int), wd_path: str, endpoint_prefix: str):
+        super().__init__(address, node_address, endpoint_prefix, wd_path, 'Test App', 'v0.0.1', 'This is a test app')
 
     def endpoints(self) -> List[EndpointDefinition]:
         return [
@@ -49,9 +49,10 @@ class TestAppProxy(AppProxy):
 
 
 class Server(Thread):
-    def __init__(self, address: (str, int), endpoint_prefix: str, wd_path: str) -> None:
+    def __init__(self, address: (str, int), node_address: (str, int), endpoint_prefix: str, wd_path: str) -> None:
         super().__init__()
         self._address = address
+        self._node_address = node_address
         self._wd_path = wd_path
         self._endpoint_prefix = endpoint_prefix
         self._running = True
@@ -68,7 +69,7 @@ class Server(Thread):
         UserDB.add_user('foobar', 'Foo Bar', 'foo.bar@email.com', 'password')
 
         # start up the app
-        app = TestApp(self._address, self._wd_path, self._endpoint_prefix)
+        app = TestApp(self._address, self._node_address, self._wd_path, self._endpoint_prefix)
         app.startup()
 
         while self._running:
@@ -91,7 +92,7 @@ class SDKAppTestCase(unittest.TestCase):
 
         # create and start server
         endpoint_prefix = '/v1/test'
-        cls._server = Server(cls._address, endpoint_prefix, cls._wd_path)
+        cls._server = Server(cls._address, None, endpoint_prefix, cls._wd_path)
         cls._server.start()
         cls._proxy = TestAppProxy(cls._address, endpoint_prefix, 'foobar', 'password')
         time.sleep(20)

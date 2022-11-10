@@ -3,7 +3,7 @@ import os
 from saas.core.helpers import write_json_to_file, read_json_from_file
 from saas.core.keystore import Keystore
 from saas.dor.schemas import DataObject
-from saas.sdk.base import SaaS
+from saas.sdk.base import connect
 
 """
 SDK Example: this example shows how to use the SDK to build an application. The SaaS SDK defines a set of convenient
@@ -39,7 +39,7 @@ def main():
     print(f"the keystore file is located at {directory} and should look like this: {keystore.identity.id}.json")
 
     # use the keystore to create a SaaS context (the identity is automatically published to the node)
-    context = SaaS.connect(address, keystore)
+    context = connect(address, keystore)
 
     """
     (2) Deploying a processor (NOTE: if the node uses strict deployment rules, this only works if the keystore is 
@@ -91,7 +91,7 @@ def main():
     # is accessed. in short: to proof the entity has the rights to use the data object. of course, this also
     # requires that the data object owner has actually given access permissions to the user... the high-level
     # SDK takes care of creating signatures.
-    output = proc.execute({
+    output = proc.submit_and_wait({
         'a': obj_a,  # in this case we assign the object we just uploaded, a so called by-reference assignment
         'b': {"v": 2}  # in this case we assign the content of the data object directly, a so called by-value assignment
     })
@@ -104,7 +104,8 @@ def main():
     # may have to be granted first by the owner. in this example, we have always used the same identity, so the
     # user accessing the contents also happens to be the owner so no problem here.
     obj_c = output['c']
-    download_path = obj_c.download(directory, 'c')
+    download_path = os.path.join(directory, 'c')
+    obj_c.download(download_path)
 
     # load the result
     c = read_json_from_file(download_path)
