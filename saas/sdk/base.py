@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import threading
 import time
-from typing import List, Union, Dict, Optional
+from typing import List, Union, Dict, Optional, Callable
 
 from pydantic import BaseModel
 
@@ -230,6 +230,10 @@ class SDKJob:
             return False
 
     @property
+    def content(self) -> Job:
+        return self._job
+
+    @property
     def status(self) -> Optional[JobStatus]:
         # get the latest state
         with self._mutex:
@@ -271,10 +275,15 @@ class SDKJob:
             status = self._rti.cancel_job(self._job.id, self._user)
             return status
 
-    def wait(self, pace: float = 1.0) -> Dict[str, SDKCDataObject]:
+    def wait(self, pace: float = 1.0, callback_progress: Callable[[int], None] = None) -> Dict[str, SDKCDataObject]:
         # wait until the job has finished
         while True:
             status = self.status
+
+            # do we have a progress callback?
+            if callback_progress:
+                callback_progress(status.progress)
+
             if status.state in [JobStatus.State.INITIALISED, JobStatus.State.RUNNING]:
                 time.sleep(pace)
 

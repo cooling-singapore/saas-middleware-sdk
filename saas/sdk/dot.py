@@ -1,29 +1,9 @@
 import abc
-import numpy as np
 
 from typing import Dict, List
-from pydantic import BaseModel
 
 from saas.core.exceptions import ExceptionContent
 from saas.core.helpers import generate_random_string
-
-
-class BoundingBox(BaseModel):
-    west: float
-    north: float
-    east: float
-    south: float
-
-
-class Dimensions(BaseModel):
-    width: int
-    height: int
-
-
-class DOTResultContext(abc.ABC):
-    @abc.abstractmethod
-    def caz_mask(self, bounding_box: BoundingBox, dimensions: Dimensions) -> np.ndarray:
-        ...
 
 
 class DOTRuntimeError(Exception):
@@ -57,5 +37,5 @@ class DataObjectType(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def extract_feature(self, content_path: str, parameters: dict, context: DOTResultContext) -> Dict:
+    def extract_feature(self, content_path: str, parameters: dict) -> Dict:
         pass
