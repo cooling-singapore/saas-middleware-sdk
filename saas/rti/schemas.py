@@ -4,7 +4,8 @@ from typing import Literal, Optional, List, Union, Dict
 from pydantic import BaseModel, Field
 
 from saas.core.exceptions import ExceptionContent
-from saas.dor.schemas import GitProcessorPointer
+from saas.dor.schemas import GitProcessorPointer, CDataObject
+from saas.nodedb.schemas import NodeInfo
 
 
 class Task(BaseModel):
@@ -44,6 +45,7 @@ class Job(BaseModel):
     id: str = Field(..., title="Id", description="The job id.", example="Ikn7dPv6")
     task: Task = Field(..., title="Task", description="The task of this job")
     retain: bool = Field(..., title="Retain", description="Indicates if the RTI should retain the working directory of this job. This is only used for debugging and testing purposes.", example=False)
+    custodian: NodeInfo = Field(..., title='Custodian', description="Information about the node that hosts this job.")
 
 
 class ReconnectInfo(BaseModel):
@@ -68,6 +70,7 @@ class JobStatus(BaseModel):
         FAILED = 'failed'
         TIMEOUT = 'timeout'
         SUCCESSFUL = 'successful'
+        CANCELLED = 'cancelled'
 
     class Error(BaseModel):
         """
@@ -76,9 +79,9 @@ class JobStatus(BaseModel):
         message: str = Field(..., title="Message", description="A simple message indicating the nature of the problem.")
         exception: ExceptionContent = Field(..., title="Exception", description="Detailed information about an exception that occured during job execution.")
 
-    state: Literal[State.INITIALISED, State.RUNNING, State.FAILED, State.TIMEOUT, State.SUCCESSFUL] = Field(..., title="State", description="The state of the job.")
+    state: Literal[State.INITIALISED, State.RUNNING, State.FAILED, State.TIMEOUT, State.SUCCESSFUL, State.CANCELLED] = Field(..., title="State", description="The state of the job.")
     progress: int = Field(..., title="Progress", description="An integer value indicating the progress in %.", example=55)
-    output: Dict[str, str] = Field(..., title="Output", description="A mapping of product names (i.e., the outputs of the job) and the corresponding object ids.", example={'heatmap': '2b3f0ceba8a3cdd1fce97947fe2a21e77033798f99bf2a8df0d9f2f3aa567c30'})
+    output: Dict[str, CDataObject] = Field(..., title="Output", description="A mapping of product names (i.e., the outputs of the job) and the corresponding object meta information.")
     notes: dict = Field(..., title="Notes", description="Any notes that may have been logged during the execution.")
     job: Job = Field(..., title="Job", description="The job information.")
     reconnect: Optional[ReconnectInfo] = Field(title="Reconnect Info", description="Information that would allow the user to reconnect to a job in case the connection was lost.")

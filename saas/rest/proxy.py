@@ -1,13 +1,17 @@
 import json
 import time
-from typing import Union, Optional
+import traceback
+from typing import Union, Optional, BinaryIO
 
 import requests
+from snappy import snappy
 
+from saas.core.exceptions import SaaSRuntimeException
 from saas.core.helpers import hash_string_object, hash_json_object, hash_bytes_object
 from saas.core.keystore import Keystore
 from saas.rest.exceptions import UnexpectedHTTPError, UnsuccessfulRequestError, UnexpectedContentType, \
     UnsuccessfulConnectionError
+from saas.rest.schemas import Token
 
 
 def extract_response(response: requests.Response) -> Optional[Union[dict, list]]:
@@ -23,7 +27,15 @@ def extract_response(response: requests.Response) -> Optional[Union[dict, list]]
         return response.json()
 
     elif response.status_code == 500:
-        content = response.json()
+        try:
+            content = response.json()
+        except Exception as e:
+            trace = ''.join(traceback.format_exception(None, e, e.__traceback__))
+            raise SaaSRuntimeException("Unexpected error", details={
+                'exception': e,
+                'trace': trace
+            })
+
         raise UnsuccessfulRequestError(
             content['reason'], content['id'], content['details'] if 'details' in content else None
         )
@@ -56,11 +68,37 @@ def generate_authorisation_token(authority: Keystore, url: str, body: dict = Non
     return authority.sign(token)
 
 
-def _make_headers(authority: Keystore, url: str, body: Union[dict, list] = None) -> Optional[dict]:
-    return {
-        'saasauth-iid': authority.identity.id,
-        'saasauth-signature': generate_authorisation_token(authority, url, body)
-    }
+def _make_headers(url: str, body: Union[dict, list] = None, authority: Keystore = None,
+                  token: Token = None) -> dict:
+
+    headers = {}
+
+    if authority:
+        headers['saasauth-iid'] = authority.identity.id
+        headers['saasauth-signature'] = generate_authorisation_token(authority, url, body)
+
+    if token:
+        headers['Authorization'] = f"Bearer {token.access_token}"
+
+    return headers
+
+
+class Snapper:
+    def __init__(self, source: BinaryIO, chunk_size: int = 1024*1024) -> None:
+        self._source = source
+        self._chunk_size = chunk_size
+
+    def read(self) -> bytes:
+        buffer = bytearray()
+        while True:
+            chunk = self._source.read(self._chunk_size)
+            if not chunk:
+                return bytes(buffer)
+            chunk = snappy.compress(chunk)
+
+            chunk_length = len(chunk)
+            buffer.extend(chunk_length.to_bytes(4, byteorder='big'))
+            buffer.extend(chunk)
 
 
 class EndpointProxy:
@@ -73,14 +111,14 @@ class EndpointProxy:
         return self._remote_address
 
     def get(self, endpoint: str, body: Union[dict, list] = None, parameters: dict = None, download_path: str = None,
-            with_authorisation_by: Keystore = None) -> Optional[Union[dict, list]]:
+            with_authorisation_by: Keystore = None, token: Token = None) -> Optional[Union[dict, list]]:
 
         url = self._make_url(endpoint, parameters)
-        headers = _make_headers(with_authorisation_by, f"GET:{url}", body) if with_authorisation_by else {}
+        headers = _make_headers(f"GET:{url}", body=body, authority=with_authorisation_by, token=token)
 
         try:
             if download_path:
-                with requests.get(url, headers=headers, data=body, stream=True) as response:
+                with requests.get(url, headers=headers, json=body, stream=True) as response:
                     header = {k.lower(): v for k, v in response.headers.items()}
                     if header['content-type'] == 'application/json':
                         return extract_response(response)
@@ -105,17 +143,21 @@ class EndpointProxy:
             raise UnsuccessfulConnectionError(url)
 
     def put(self, endpoint: str, body: Union[dict, list] = None, parameters: dict = None, attachment_path: str = None,
-            with_authorisation_by: Keystore = None) -> Union[dict, list]:
+            with_authorisation_by: Keystore = None, token: Token = None) -> Union[dict, list]:
 
         url = self._make_url(endpoint, parameters)
-        headers = _make_headers(with_authorisation_by, f"PUT:{url}", body) if with_authorisation_by else {}
+        headers = _make_headers(f"PUT:{url}", body=body, authority=with_authorisation_by, token=token)
 
         try:
             if attachment_path:
-                response = requests.post(url,
-                                         data={'body': json.dumps(body)},
-                                         files={'attachment': open(attachment_path, 'rb')})
-                return extract_response(response)
+                with open(attachment_path, 'rb') as f:
+                    response = requests.put(url,
+                                            headers=headers,
+                                            data={'body': json.dumps(body)} if body else None,
+                                            files={'attachment': Snapper(f)}
+                                            )
+
+                    return extract_response(response)
 
             else:
                 response = requests.put(url, headers=headers, json=body)
@@ -124,32 +166,46 @@ class EndpointProxy:
         except requests.exceptions.ConnectionError:
             raise UnsuccessfulConnectionError(url)
 
-    def post(self, endpoint: str, body: Union[dict, list, str] = None, parameters: dict = None,
-             attachment_path: str = None, with_authorisation_by: Keystore = None) -> Union[dict, list]:
+    def auth_post(self, endpoint: str, data=None) -> dict:
+        url = f"http://{self._remote_address[0]}:{self._remote_address[1]}{endpoint}"
+
+        try:
+            response = requests.post(url, data=data)
+            return extract_response(response)
+
+        except requests.exceptions.ConnectionError:
+            raise UnsuccessfulConnectionError(url)
+
+    def post(self, endpoint: str, body: Union[dict, list, str] = None, data=None, parameters: dict = None,
+             attachment_path: str = None, with_authorisation_by: Keystore = None, token: Token = None) -> Union[dict,
+                                                                                                                list]:
 
         url = self._make_url(endpoint, parameters)
-        headers = _make_headers(with_authorisation_by, f"POST:{url}", body) if with_authorisation_by else {}
+        headers = _make_headers(f"POST:{url}", body=body, authority=with_authorisation_by, token=token)
 
         try:
             if attachment_path:
                 with open(attachment_path, 'rb') as f:
                     response = requests.post(url,
-                                             data={'body': json.dumps(body)},
-                                             files={'attachment': f})
+                                             headers=headers,
+                                             data={'body': json.dumps(body)} if body else None,
+                                             files={'attachment': Snapper(f)}
+                                             )
+
                     return extract_response(response)
 
             else:
-                response = requests.post(url, headers=headers, json=body)
+                response = requests.post(url, headers=headers, data=data, json=body)
                 return extract_response(response)
 
         except requests.exceptions.ConnectionError:
             raise UnsuccessfulConnectionError(url)
 
     def delete(self, endpoint: str, body: Union[dict, list] = None, parameters: dict = None,
-               with_authorisation_by: Keystore = None) -> Union[dict, list]:
+               with_authorisation_by: Keystore = None, token: Token = None) -> Union[dict, list]:
 
         url = self._make_url(endpoint, parameters)
-        headers = _make_headers(with_authorisation_by, f"DELETE:{url}", body) if with_authorisation_by else {}
+        headers = _make_headers(f"DELETE:{url}", body=body, authority=with_authorisation_by, token=token)
 
         try:
             response = requests.delete(url, headers=headers, json=body)
@@ -161,7 +217,12 @@ class EndpointProxy:
     def _make_url(self, endpoint: str, parameters: dict = None) -> str:
         url = f"http://{self._remote_address[0]}:{self._remote_address[1]}{self._endpoint_prefix}{endpoint}"
         if parameters:
-            for i in range(len(parameters)):
-                url += '?' if i == 0 else '&'
-                url += parameters[i][0] + '=' + parameters[i][1]
+            eligible = {}
+            for k, v in parameters.items():
+                if k is not None and v is not None:
+                    eligible[k] = v
+
+            if eligible:
+                url += '?' + '&'.join(f"{k}={v}" for k, v in eligible.items())
+
         return url

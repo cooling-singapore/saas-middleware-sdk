@@ -12,6 +12,12 @@ from saas.nodedb.schemas import NodeInfo
 from saas.rti.proxy import RTIProxy
 from saas.rti.schemas import Task, Job, JobStatus
 
+"""
+API Example: this example shows how to use the REST API to build an application. Note: there should be no reason
+for an application developer to work directly with the API. Instead the SDK should be used which wraps the API in
+a convenient set of classes and functions. 
+"""
+
 
 def create_and_publish_identity(node_address: (str, int), keystore_path: str, password: str) -> Keystore:
     # create a new keystore
@@ -112,7 +118,7 @@ def upload_gpp_and_deploy_adapter(node_address: (str, int), user: Keystore) -> s
 
 
 def submit_job(node_address: (str, int), proc_id: str, user: Keystore) -> (str, str):
-    # background: in this example, we use the example adapter found in '/saasadapters/exapmle' of the same repository
+    # background: in this example, we use the example adapter found in '/examples/adapters' of the same repository
     # that contains this example application. the processor is simple: it takes two input data objects that
     # contain values, adds them up, and produces the sum as output. A + B = C
 
@@ -205,15 +211,15 @@ def retrieve_results(node_address: (str, int), job_id: str, user: Keystore, down
     # the resulting data object 'c' has been stored in the DOR. let's figure out the data object id
     rti = RTIProxy(node_address)
     status: JobStatus = rti.get_job_status(job_id, with_authorisation_by=user)
-    c_obj_id = status.output['c']
-    print(f"the object id of 'c' is: {c_obj_id}")
+    c_meta = status.output['c']
+    print(f"the object id of 'c' is: {c_meta.obj_id}")
 
     # get the content of data object 'c'
     dor = DORProxy(node_address)
-    dor.get_content(c_obj_id, with_authorisation_by=user, download_path=download_path)
+    dor.get_content(c_meta.obj_id, with_authorisation_by=user, download_path=download_path)
     print(f"the content of data object 'c' is downloaded to '{download_path}'")
 
-    return c_obj_id
+    return c_meta.obj_id
 
 
 def retrieve_logs(node_address: (str, int), job_id: str, user: Keystore, download_path: str) -> None:
@@ -264,7 +270,6 @@ def main():
     password protected).
     """
     # create and publish a new identity...
-    # host = '10.8.0.6'
     host = '127.0.0.1'
     port = 5001
     address = [host, port]  # the REST API address of your node
