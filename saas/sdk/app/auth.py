@@ -1,5 +1,5 @@
 import os.path
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, timedelta
 
 from fastapi import Depends, HTTPException, status
@@ -53,7 +53,7 @@ class UserDB:
     _keystores = {}
 
     @classmethod
-    def initialise(cls, wd_path: str):
+    def initialise(cls, wd_path: str) -> None:
         # create directories
         cls._keystore_path = os.path.join(wd_path, 'keystores')
         os.makedirs(cls._keystore_path, exist_ok=True)
@@ -65,26 +65,74 @@ class UserDB:
         cls._Session = sessionmaker(bind=cls._engine)
 
     @classmethod
+    def _resolve_keystore(cls, keystore_id: str, keystore_password: str) -> Keystore:
+        if keystore_id not in cls._keystores:
+            keystore_path = os.path.join(cls._keystore_path, f"{keystore_id}.json")
+            cls._keystores[keystore_id] = Keystore.load(keystore_path, keystore_password)
+        return cls._keystores[keystore_id]
+
+    @classmethod
     def get_user(cls, username: str) -> Optional[User]:
         with cls._Session() as session:
             record = session.query(UserRecord).get(username)
             if record:
-                if record.username not in cls._keystores:
-                    # load the keystore
-                    keystore_path = os.path.join(cls._keystore_path, f"{record.keystore_id}.json")
-                    cls._keystores[record.username] = Keystore.load(keystore_path, record.keystore_password)
-
                 return User(
                     username=record.username,
                     name=record.name,
                     email=record.email,
                     disabled=record.disabled,
                     hashed_password=record.hashed_password,
-                    keystore=cls._keystores[record.username]
+                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
                 )
 
             else:
                 return None
+
+    @classmethod
+    def delete_user(cls, username: str) -> Optional[User]:
+        with cls._Session() as session:
+            q = session.query(UserRecord).filter_by(username=username)
+
+            # does the user exist?
+            record = q.first()
+            if not record:
+                raise AppRuntimeError(f"Username does not exist", details={
+                    'username': username
+                })
+
+            # create the user object
+            result = User(
+                username=record.username,
+                name=record.name,
+                email=record.email,
+                disabled=record.disabled,
+                hashed_password=record.hashed_password,
+                keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
+            )
+
+            # remove the keystore and delete it
+            cls._resolve_keystore(record.keystore_id, record.keystore_password)
+            keystore = cls._keystores.pop(record.keystore_id)
+            keystore.delete()
+
+            # remove the record
+            q.delete()
+            session.commit()
+
+            return result
+
+    @classmethod
+    def all_users(cls) -> List[User]:
+        with cls._Session() as session:
+            records = session.query(UserRecord).all()
+            return [User(
+                username=record.username,
+                name=record.name,
+                email=record.email,
+                disabled=record.disabled,
+                hashed_password=record.hashed_password,
+                keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
+            ) for record in records]
 
     @classmethod
     def add_user(cls, username: str, name: str, email: str, password: str) -> User:
@@ -99,6 +147,7 @@ class UserDB:
             # create a new keystore
             keystore_password = generate_random_string(16)
             keystore = Keystore.create(cls._keystore_path, name, email, keystore_password)
+            cls._keystores[keystore.identity.id] = keystore
 
             # add new user (with a randomly generated password)
             disabled = False
@@ -117,6 +166,50 @@ class UserDB:
                 hashed_password=hashed_password,
                 keystore=keystore
             )
+
+    @classmethod
+    def enable_user(cls, username: str) -> User:
+        with cls._Session() as session:
+            # check if this username already exists
+            record = session.query(UserRecord).get(username)
+            if record:
+                record.disabled = False
+                session.commit()
+
+                return User(
+                    username=record.username,
+                    name=record.name,
+                    email=record.email,
+                    disabled=record.disabled,
+                    hashed_password=record.hashed_password,
+                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
+                )
+            else:
+                raise AppRuntimeError("Username does not exist", details={
+                    'username': username
+                })
+
+    @classmethod
+    def disable_user(cls, username: str) -> User:
+        with cls._Session() as session:
+            # check if this username already exists
+            record = session.query(UserRecord).get(username)
+            if record:
+                record.disabled = True
+                session.commit()
+
+                return User(
+                    username=record.username,
+                    name=record.name,
+                    email=record.email,
+                    disabled=record.disabled,
+                    hashed_password=record.hashed_password,
+                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
+                )
+            else:
+                raise AppRuntimeError("Username does not exist", details={
+                    'username': username
+                })
 
 
 class UserAuth:
