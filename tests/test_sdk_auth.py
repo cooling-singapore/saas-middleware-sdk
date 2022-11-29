@@ -34,7 +34,7 @@ class SDKAuthTestCase(unittest.TestCase):
         assert(len(users) == 0)
 
         # create a new user
-        user = UserDB.add_user('johndoe', 'John Doe', 'email', 'password')
+        user = UserDB.add_user('johndoe', 'John Doe', 'password')
         print(user)
         assert(user is not None)
         assert(os.path.isfile(user.keystore.path))
@@ -47,11 +47,11 @@ class SDKAuthTestCase(unittest.TestCase):
 
         # try to create a user with the same username
         try:
-            UserDB.add_user('johndoe', 'John Doe', 'email', 'password')
+            UserDB.add_user('johndoe', 'John Doe', 'password')
             assert False
 
         except AppRuntimeError as e:
-            assert(e.reason == 'Username already exists')
+            assert(e.reason == 'User account already exists')
 
         # delete user
         user = UserDB.delete_user('johndoe')
@@ -66,21 +66,21 @@ class SDKAuthTestCase(unittest.TestCase):
             assert False
 
         except AppRuntimeError as e:
-            assert(e.reason == 'Username does not exist')
+            assert(e.reason == 'User account does not exist')
 
     def test_enable_disable_user(self):
         UserDB.initialise(self.wd_path)
 
         # create a new user
-        user = UserDB.add_user('johndoe', 'John Doe', 'email', 'password')
+        user = UserDB.add_user('johndoe', 'John Doe', 'password')
         print(user)
         assert(user is not None)
         assert(os.path.isfile(user.keystore.path))
 
         assert(user.disabled is False)
-        user = UserDB.disable_user(user.username)
+        user = UserDB.disable_user(user.login)
         assert(user.disabled is True)
-        user = UserDB.enable_user(user.username)
+        user = UserDB.enable_user(user.login)
         assert(user.disabled is False)
 
 
