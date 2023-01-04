@@ -15,6 +15,7 @@ from saas.core.identity import Identity
 from saas.core.keystore import Keystore
 from saas.rest.schemas import Token
 from saas.sdk.app.exceptions import AppRuntimeError
+from saas.sdk.base import publish_identity
 
 Base = declarative_base()
 
@@ -61,6 +62,11 @@ class UserDB:
         cls._engine = create_engine(db_path)
         Base.metadata.create_all(cls._engine)
         cls._Session = sessionmaker(bind=cls._engine)
+
+    @classmethod
+    def publish_all_user_identities(cls, node_address: (str, int)) -> None:
+        for user in UserDB.all_users():
+            publish_identity(node_address, user.identity)
 
     @classmethod
     def _resolve_keystore(cls, keystore_id: str, keystore_password: str) -> Keystore:
@@ -130,7 +136,7 @@ class UserDB:
             ) for record in records]
 
     @classmethod
-    def add_user(cls, login: str, name: str, password: str) -> User:
+    def add_user(cls, login: str, name: str, password: str, node_address: (str, int) = None) -> User:
         with cls._Session() as session:
             # check if this username already exists
             record = session.query(UserRecord).get(login)
@@ -151,6 +157,10 @@ class UserDB:
                                    keystore_id=keystore.identity.id, keystore_password=keystore_password,
                                    hashed_password=hashed_password))
             session.commit()
+
+            # publish the identity (if we have a node address)
+            if node_address:
+                publish_identity(node_address, keystore.identity)
 
             # read the record and return the user
             return User(

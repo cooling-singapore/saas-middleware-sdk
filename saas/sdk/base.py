@@ -465,12 +465,17 @@ class SDKContext:
         db.update_identity(identity)
 
 
-def connect(address: (str, int), user: Keystore) -> SDKContext:
-    # publish the identity (may not be needed but just to be sure)
+def publish_identity(address: (str, int), identity: Identity) -> None:
     db = NodeDBProxy(address)
-    db.update_identity(user.identity)
+    db.update_identity(identity)
+
+
+def connect(address: (str, int), user: Keystore) -> SDKContext:
+    # publish the user identity (may not be needed but just to be sure)
+    publish_identity(address, user.identity)
 
     # fetch information about the network
+    db = NodeDBProxy(address)
     dor_nodes: List[NodeInfo] = []
     rti_nodes: List[NodeInfo] = []
     for node in db.get_network():
