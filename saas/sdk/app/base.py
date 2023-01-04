@@ -100,7 +100,6 @@ class Application(abc.ABC):
                                                    daemon=True)
         self._invalidate_thread.start()
 
-
     def _register(self, endpoint: EndpointDefinition) -> None:
         route = f"{endpoint.prefix}/{endpoint.rule}"
         logger.info(f"REST app is mapping {endpoint.method}:{route} to {endpoint.function}")
