@@ -422,7 +422,7 @@ class SDKContext:
                                                                                              SDKGPPDataObject]]:
 
         result = []
-        for node in self._rti_nodes.values():
+        for node in self._dor_nodes.values():
             dor = DORProxy(node.rest_address)
             for meta in dor.search(patterns=patterns, owner_iid=owner_iid, data_type=data_type,
                                    data_format=data_format, c_hashes=c_hashes):
