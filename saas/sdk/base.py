@@ -433,6 +433,21 @@ class SDKContext:
                     result.append(SDKGPPDataObject(meta, self._user))
         return result
 
+    def find_all_jobs_with_status(self) -> List[SDKJob]:
+        results = []
+        for node in self._rti_nodes.values():
+            rti = RTIProxy(node.rest_address)
+            jobs = rti.get_jobs_by_user(self._user)
+            for job in jobs:
+                # get the corresponding processor
+                for proc in rti.get_deployed():
+                    if proc.proc_id == job.task.proc_id:
+                        proc = SDKProcessor(proc, self._user, node)
+                        results.append(SDKJob(proc, job, self._user))
+                        break
+
+        return results
+
     def find_job(self, job_id) -> Optional[SDKJob]:
         for node in self._rti_nodes.values():
             rti = RTIProxy(node.rest_address)
