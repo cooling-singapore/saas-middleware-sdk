@@ -89,7 +89,10 @@ class Application(abc.ABC):
         os.makedirs(os.path.join(self._wd_path), exist_ok=True)
 
         self._mutex = Lock()
-        self._api = FastAPI()
+        self._api = FastAPI(
+            openapi_url=f"{self._endpoint_prefix}/openapi.json",
+            docs_url=f"{self._endpoint_prefix}/docs"
+        )
         self._thread = None
 
         self._context: Dict[str, SDKContext] = {}
