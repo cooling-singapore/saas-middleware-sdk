@@ -471,7 +471,7 @@ class SDKContext:
 
     def publish_identity(self, identity: Identity) -> None:
         # get the nodes
-        nodes = list(self._rti_nodes.values()) + list(self._dor_nodes)
+        nodes = list(self._rti_nodes.values()) + list(self._dor_nodes.values())
         if not nodes:
             raise SaaSRuntimeException("No nodes found")
 
