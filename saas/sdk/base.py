@@ -475,9 +475,9 @@ class SDKContext:
         if not nodes:
             raise SaaSRuntimeException("No nodes found")
 
-        # pick one
-        db = NodeDBProxy(nodes[0].rest_address)
-        db.update_identity(identity)
+        for node in nodes:
+            db = NodeDBProxy(node.rest_address)
+            db.update_identity(identity)
 
 
 def publish_identity(address: (str, int), identity: Identity) -> None:
