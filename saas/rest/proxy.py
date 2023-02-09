@@ -143,7 +143,7 @@ class EndpointProxy:
             raise UnsuccessfulConnectionError(url)
 
     def put(self, endpoint: str, body: Union[dict, list] = None, parameters: dict = None, attachment_path: str = None,
-            with_authorisation_by: Keystore = None, token: Token = None) -> Union[dict, list]:
+            with_authorisation_by: Keystore = None, token: Token = None, use_snappy: bool = True) -> Union[dict, list]:
 
         url = self._make_url(endpoint, parameters)
         headers = _make_headers(f"PUT:{url}", body=body, authority=with_authorisation_by, token=token)
@@ -154,7 +154,7 @@ class EndpointProxy:
                     response = requests.put(url,
                                             headers=headers,
                                             data={'body': json.dumps(body)} if body else None,
-                                            files={'attachment': Snapper(f)}
+                                            files={'attachment': Snapper(f) if use_snappy else f}
                                             )
 
                     return extract_response(response)
@@ -177,8 +177,8 @@ class EndpointProxy:
             raise UnsuccessfulConnectionError(url)
 
     def post(self, endpoint: str, body: Union[dict, list, str] = None, data=None, parameters: dict = None,
-             attachment_path: str = None, with_authorisation_by: Keystore = None, token: Token = None) -> Union[dict,
-                                                                                                                list]:
+             attachment_path: str = None, with_authorisation_by: Keystore = None, token: Token = None,
+             use_snappy: bool = True) -> Union[dict, list]:
 
         url = self._make_url(endpoint, parameters)
         headers = _make_headers(f"POST:{url}", body=body, authority=with_authorisation_by, token=token)
@@ -189,7 +189,7 @@ class EndpointProxy:
                     response = requests.post(url,
                                              headers=headers,
                                              data={'body': json.dumps(body)} if body else None,
-                                             files={'attachment': Snapper(f)}
+                                             files={'attachment': Snapper(f) if use_snappy else f}
                                              )
 
                     return extract_response(response)

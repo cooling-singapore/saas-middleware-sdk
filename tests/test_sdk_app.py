@@ -29,7 +29,7 @@ class TestApp(Application):
         ]
 
     def protected(self, current_user: User = Depends(get_current_active_user)) -> TestResponse:
-        return TestResponse(message=f"hello protected world!!! {current_user.username}")
+        return TestResponse(message=f"hello protected world!!! {current_user.login}")
 
     def unprotected(self) -> TestResponse:
         return TestResponse(message='hello open world!!!')
@@ -66,7 +66,7 @@ class Server(Thread):
         UserAuth.initialise(create_rnd_hex_string(32))
 
         # create user
-        UserDB.add_user('foobar', 'Foo Bar', 'foo.bar@email.com', 'password')
+        UserDB.add_user('foo.bar@somewhere.com', 'Foo Bar', 'password')
 
         # start up the app
         app = TestApp(self._address, self._node_address, self._wd_path, self._endpoint_prefix)
@@ -94,7 +94,7 @@ class SDKAppTestCase(unittest.TestCase):
         endpoint_prefix = '/v1/test'
         cls._server = Server(cls._address, None, endpoint_prefix, cls._wd_path)
         cls._server.start()
-        cls._proxy = TestAppProxy(cls._address, endpoint_prefix, 'foobar', 'password')
+        cls._proxy = TestAppProxy(cls._address, endpoint_prefix, 'foo.bar@somewhere.com', 'password')
         time.sleep(20)
 
     @classmethod
@@ -124,7 +124,7 @@ class SDKAppTestCase(unittest.TestCase):
     def test_protected_endpoint(self):
         response = self._proxy.protected()
         print(response)
-        assert('foobar' in response.message)
+        assert('foo.bar@somewhere.com' in response.message)
 
 
 if __name__ == '__main__':

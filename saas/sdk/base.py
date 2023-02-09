@@ -422,7 +422,7 @@ class SDKContext:
                                                                                              SDKGPPDataObject]]:
 
         result = []
-        for node in self._rti_nodes.values():
+        for node in self._dor_nodes.values():
             dor = DORProxy(node.rest_address)
             for meta in dor.search(patterns=patterns, owner_iid=owner_iid, data_type=data_type,
                                    data_format=data_format, c_hashes=c_hashes):
@@ -432,6 +432,21 @@ class SDKContext:
                 else:
                     result.append(SDKGPPDataObject(meta, self._user))
         return result
+
+    def find_all_jobs_with_status(self) -> List[SDKJob]:
+        results = []
+        for node in self._rti_nodes.values():
+            rti = RTIProxy(node.rest_address)
+            jobs = rti.get_jobs_by_user(self._user)
+            for job in jobs:
+                # get the corresponding processor
+                for proc in rti.get_deployed():
+                    if proc.proc_id == job.task.proc_id:
+                        proc = SDKProcessor(proc, self._user, node)
+                        results.append(SDKJob(proc, job, self._user))
+                        break
+
+        return results
 
     def find_job(self, job_id) -> Optional[SDKJob]:
         for node in self._rti_nodes.values():
@@ -456,21 +471,26 @@ class SDKContext:
 
     def publish_identity(self, identity: Identity) -> None:
         # get the nodes
-        nodes = list(self._rti_nodes.values()) + list(self._dor_nodes)
+        nodes = list(self._rti_nodes.values()) + list(self._dor_nodes.values())
         if not nodes:
             raise SaaSRuntimeException("No nodes found")
 
-        # pick one
-        db = NodeDBProxy(nodes[0].rest_address)
-        db.update_identity(identity)
+        for node in nodes:
+            db = NodeDBProxy(node.rest_address)
+            db.update_identity(identity)
+
+
+def publish_identity(address: (str, int), identity: Identity) -> None:
+    db = NodeDBProxy(address)
+    db.update_identity(identity)
 
 
 def connect(address: (str, int), user: Keystore) -> SDKContext:
-    # publish the identity (may not be needed but just to be sure)
-    db = NodeDBProxy(address)
-    db.update_identity(user.identity)
+    # publish the user identity (may not be needed but just to be sure)
+    publish_identity(address, user.identity)
 
     # fetch information about the network
+    db = NodeDBProxy(address)
     dor_nodes: List[NodeInfo] = []
     rti_nodes: List[NodeInfo] = []
     for node in db.get_network():

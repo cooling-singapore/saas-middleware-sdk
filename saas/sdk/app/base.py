@@ -56,7 +56,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         )
 
     # try to get the user
-    user = UserDB.get_user(username=token_data.username)
+    user = UserDB.get_user(login=token_data.username)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -89,7 +89,10 @@ class Application(abc.ABC):
         os.makedirs(os.path.join(self._wd_path), exist_ok=True)
 
         self._mutex = Lock()
-        self._api = FastAPI()
+        self._api = FastAPI(
+            openapi_url=f"{self._endpoint_prefix}/openapi.json",
+            docs_url=f"{self._endpoint_prefix}/docs"
+        )
         self._thread = None
 
         self._context: Dict[str, SDKContext] = {}
@@ -99,7 +102,6 @@ class Application(abc.ABC):
                                                    args=(context_expiry,),
                                                    daemon=True)
         self._invalidate_thread.start()
-
 
     def _register(self, endpoint: EndpointDefinition) -> None:
         route = f"{endpoint.prefix}/{endpoint.rule}"
@@ -140,10 +142,10 @@ class Application(abc.ABC):
 
     def _get_context(self, user: User) -> SDKContext:
         with self._mutex:
-            if user.username not in self._context:
-                logger.debug(f"[context_invalidator] context created: {user.username}")
-                self._context[user.username] = connect(self._node_address, user.keystore)
-            return self._context[user.username]
+            if user.login not in self._context:
+                logger.debug(f"[context_invalidator] context created: {user.login}")
+                self._context[user.login] = connect(self._node_address, user.keystore)
+            return self._context[user.login]
 
     async def _close(self) -> None:
         logger.info(f"REST app is shutting down.")

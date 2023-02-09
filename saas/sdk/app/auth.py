@@ -15,15 +15,15 @@ from saas.core.identity import Identity
 from saas.core.keystore import Keystore
 from saas.rest.schemas import Token
 from saas.sdk.app.exceptions import AppRuntimeError
+from saas.sdk.base import publish_identity
 
 Base = declarative_base()
 
 
 class UserRecord(Base):
     __tablename__ = 'user'
-    username = Column(String(16), primary_key=True)
+    login = Column(String, primary_key=True)
     name = Column(String, nullable=False)
-    email = Column(String, nullable=False)
     disabled = Column(Boolean, nullable=False)
     keystore_id = Column(String(64), nullable=False)
     keystore_password = Column(String, nullable=False)
@@ -34,9 +34,8 @@ class User(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    username: str
     name: str
-    email: str
+    login: str
     disabled: bool
     hashed_password: str
     keystore: Keystore
@@ -65,6 +64,11 @@ class UserDB:
         cls._Session = sessionmaker(bind=cls._engine)
 
     @classmethod
+    def publish_all_user_identities(cls, node_address: (str, int)) -> None:
+        for user in UserDB.all_users():
+            publish_identity(node_address, user.identity)
+
+    @classmethod
     def _resolve_keystore(cls, keystore_id: str, keystore_password: str) -> Keystore:
         if keystore_id not in cls._keystores:
             keystore_path = os.path.join(cls._keystore_path, f"{keystore_id}.json")
@@ -72,14 +76,13 @@ class UserDB:
         return cls._keystores[keystore_id]
 
     @classmethod
-    def get_user(cls, username: str) -> Optional[User]:
+    def get_user(cls, login: str) -> Optional[User]:
         with cls._Session() as session:
-            record = session.query(UserRecord).get(username)
+            record = session.query(UserRecord).get(login)
             if record:
                 return User(
-                    username=record.username,
+                    login=record.login,
                     name=record.name,
-                    email=record.email,
                     disabled=record.disabled,
                     hashed_password=record.hashed_password,
                     keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
@@ -89,22 +92,21 @@ class UserDB:
                 return None
 
     @classmethod
-    def delete_user(cls, username: str) -> Optional[User]:
+    def delete_user(cls, login: str) -> Optional[User]:
         with cls._Session() as session:
-            q = session.query(UserRecord).filter_by(username=username)
+            q = session.query(UserRecord).filter_by(login=login)
 
             # does the user exist?
             record = q.first()
             if not record:
-                raise AppRuntimeError(f"Username does not exist", details={
-                    'username': username
+                raise AppRuntimeError(f"User account does not exist", details={
+                    'login': login
                 })
 
             # create the user object
             result = User(
-                username=record.username,
+                login=record.login,
                 name=record.name,
-                email=record.email,
                 disabled=record.disabled,
                 hashed_password=record.hashed_password,
                 keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
@@ -126,89 +128,89 @@ class UserDB:
         with cls._Session() as session:
             records = session.query(UserRecord).all()
             return [User(
-                username=record.username,
+                login=record.login,
                 name=record.name,
-                email=record.email,
                 disabled=record.disabled,
                 hashed_password=record.hashed_password,
                 keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
             ) for record in records]
 
     @classmethod
-    def add_user(cls, username: str, name: str, email: str, password: str) -> User:
+    def add_user(cls, login: str, name: str, password: str, node_address: (str, int) = None) -> User:
         with cls._Session() as session:
             # check if this username already exists
-            record = session.query(UserRecord).get(username)
+            record = session.query(UserRecord).get(login)
             if record:
-                raise AppRuntimeError("Username already exists", details={
-                    'username': username
+                raise AppRuntimeError("User account already exists", details={
+                    'login': login
                 })
 
             # create a new keystore
             keystore_password = generate_random_string(16)
-            keystore = Keystore.create(cls._keystore_path, name, email, keystore_password)
+            keystore = Keystore.create(cls._keystore_path, name, login, keystore_password)
             cls._keystores[keystore.identity.id] = keystore
 
             # add new user (with a randomly generated password)
             disabled = False
             hashed_password = UserAuth.get_password_hash(password)
-            session.add(UserRecord(username=username, name=name, email=email, disabled=disabled,
+            session.add(UserRecord(login=login, name=name, disabled=disabled,
                                    keystore_id=keystore.identity.id, keystore_password=keystore_password,
                                    hashed_password=hashed_password))
             session.commit()
 
+            # publish the identity (if we have a node address)
+            if node_address:
+                publish_identity(node_address, keystore.identity)
+
             # read the record and return the user
             return User(
-                username=username,
+                login=login,
                 name=name,
-                email=email,
                 disabled=disabled,
                 hashed_password=hashed_password,
                 keystore=keystore
             )
 
     @classmethod
-    def enable_user(cls, username: str) -> User:
+    def enable_user(cls, login: str) -> User:
         with cls._Session() as session:
             # check if this username already exists
-            record = session.query(UserRecord).get(username)
+            record = session.query(UserRecord).get(login)
             if record:
                 record.disabled = False
                 session.commit()
 
                 return User(
-                    username=record.username,
+                    login=record.login,
                     name=record.name,
-                    email=record.email,
                     disabled=record.disabled,
                     hashed_password=record.hashed_password,
                     keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
                 )
             else:
                 raise AppRuntimeError("Username does not exist", details={
-                    'username': username
+                    'login': login
                 })
 
     @classmethod
-    def disable_user(cls, username: str) -> User:
+    def disable_user(cls, login: str) -> User:
         with cls._Session() as session:
             # check if this username already exists
-            record = session.query(UserRecord).get(username)
+            record = session.query(UserRecord).get(login)
             if record:
                 record.disabled = True
                 session.commit()
 
                 return User(
-                    username=record.username,
+                    login=record.login,
                     name=record.name,
-                    email=record.email,
                     disabled=record.disabled,
                     hashed_password=record.hashed_password,
                     keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
                 )
             else:
                 raise AppRuntimeError("Username does not exist", details={
-                    'username': username
+                    'login': login
                 })
 
 
@@ -227,8 +229,8 @@ class UserAuth:
         return cls._pwd_context.verify(plain_password, hashed_password)
 
     @classmethod
-    def _authenticate_user(cls, username: str, password: str) -> Optional[User]:
-        user = UserDB.get_user(username)
+    def _authenticate_user(cls, login: str, password: str) -> Optional[User]:
+        user = UserDB.get_user(login)
         if not user:
             return None
 
@@ -255,7 +257,7 @@ class UserAuth:
         # create the token
         expiry = datetime.utcnow() + timedelta(minutes=cls._access_token_expires_minutes)
         content = {
-            'sub': user.username,
+            'sub': user.login,
             'exp': expiry
         }
         access_token = jwt.encode(content, cls.secret_key, algorithm=cls.algorithm)
