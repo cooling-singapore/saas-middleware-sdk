@@ -51,7 +51,8 @@ class SDKProcessor:
         return self._rti.get_status(self._processor.proc_id)
 
     def submit(self, consume_specs: Dict[str, Union[SDKCDataObject, Dict]],
-               product_specs: Dict[str, SDKProductSpecification] = None) -> SDKJob:
+               product_specs: Dict[str, SDKProductSpecification] = None,
+               name: str = None, description: str = None) -> SDKJob:
 
         # process consumed objects
         job_input = []
@@ -119,7 +120,8 @@ class SDKProcessor:
             ))
 
         # try to submit the job
-        job: Job = self._rti.submit_job(self._processor.proc_id, job_input, job_output, self._user)
+        job: Job = self._rti.submit_job(self._processor.proc_id, job_input, job_output, self._user,
+                                        name=name, description=description)
         return SDKJob(self, job, self._user)
 
     def submit_and_wait(self, consume_specs: Dict[str, Union[SDKCDataObject, Dict]],
