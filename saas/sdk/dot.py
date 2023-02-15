@@ -39,3 +39,17 @@ class DataObjectType(abc.ABC):
     @abc.abstractmethod
     def extract_feature(self, content_path: str, parameters: dict) -> Dict:
         pass
+
+    @abc.abstractmethod
+    def extract_delta_feature(self, content_path0: str, content_path1: str, parameters: dict) -> Dict:
+        pass
+
+    @abc.abstractmethod
+    def export_feature(self, content_path: str, parameters: dict, export_path: str, export_format: str) -> None:
+        pass
+
+    @abc.abstractmethod
+    def export_delta_feature(self, content_path0: str, content_path1: str, parameters: dict,
+                             export_path: str, export_format: str) -> None:
+        pass
+
