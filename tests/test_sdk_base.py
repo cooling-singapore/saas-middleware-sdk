@@ -140,9 +140,9 @@ class SDKBaseTestCase(unittest.TestCase):
         context = connect(self._node_address, self._keystore)
 
         # upload test GPP
-        source = 'https://github.com/cooling-singapore/saas-processor-template'
-        commit_id = '7a87928'
-        proc_path = 'processor_test'
+        source = 'https://github.com/cooling-singapore/saas-middleware-sdk'
+        commit_id = '310354f'
+        proc_path = 'examples/adapters/proc_example'
         proc_config = 'default'
         obj = context.upload_gpp(source, commit_id, proc_path, proc_config)
 
