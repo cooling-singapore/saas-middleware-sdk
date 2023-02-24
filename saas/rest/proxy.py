@@ -1,6 +1,6 @@
 import json
 import time
-import traceback
+from datetime import datetime
 from typing import Union, Optional, BinaryIO
 
 import requests
@@ -29,16 +29,14 @@ def extract_response(response: requests.Response) -> Optional[Union[dict, list]]
     elif response.status_code == 500:
         try:
             content = response.json()
-        except Exception as e:
-            trace = ''.join(traceback.format_exception(None, e, e.__traceback__))
-            raise SaaSRuntimeException("Unexpected error", details={
-                'exception': e,
-                'trace': trace
-            })
+            raise UnsuccessfulRequestError(
+                content['reason'], content['id'], content['details'] if 'details' in content else None
+            )
 
-        raise UnsuccessfulRequestError(
-            content['reason'], content['id'], content['details'] if 'details' in content else None
-        )
+        except Exception:
+            raise SaaSRuntimeException(response.reason, details={
+                'status_code': response.status_code
+            })
 
     else:
         raise UnexpectedHTTPError({
