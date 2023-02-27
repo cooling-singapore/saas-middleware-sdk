@@ -208,13 +208,31 @@ class RelayServer(Application):
         result = proxy.get_identities()
         return list(result.values())
 
-    def update_identity(self, identity: Identity) -> Identity:
+    def update_identity(self, identity: Identity, user: User = Depends(get_current_active_user)) -> Identity:
         """
         Updates an existing identity or adds a new one in case an identity with the id does not exist yet.
         """
-        proxy = NodeDBProxy(self._node_address)
-        result = proxy.update_identity(identity)
-        return result
+
+        # is this an update on a proxy identity to be used for the Relay only?
+        if identity.name.startswith('relay_proxy:'):
+            # check if the username checks out (it's not strictly speaking important but just an additional check)
+            name = identity.name[len('relay_proxy:'):]
+            if name != user.login:
+                raise RelayRuntimeError(f"User login and relay proxy identity name don't match: {user.login} != {name}")
+
+            # keep both identities for later use
+            self._user_identity = user.identity
+            self._proxy_identity = identity
+
+            # we publish and return the actual identity of the user so the SDK may use it if/when needed.
+            proxy = NodeDBProxy(self._node_address)
+            result = proxy.update_identity(user.identity)
+            return result
+
+        else:
+            proxy = NodeDBProxy(self._node_address)
+            result = proxy.update_identity(identity)
+            return result
 
     # DOR endpoints:
 
@@ -333,19 +351,6 @@ class RelayServer(Application):
         """
         raise RelayRuntimeError(f"Adding GPP data objects is not supported by the Relay application.")
 
-        # # find all dors
-        # dors = self._find_all_dors()
-        # if len(dors) == 0:
-        #     raise RelayRuntimeError(f"No DORs found")
-        #
-        # # pick one // TODO: users should be able to indicate preference
-        # dor = DORProxy(dors[0])
-        # obj = dor.add_gpp_data_object(source=p.source, commit_id=p.commit_id, proc_path=p.proc_path,
-        #                               proc_config=p.proc_config, owner=user.identity,
-        #                               github_credentials=p.github_credentials)
-        #
-        # return obj
-
     def remove(self, obj_id: str,
                user: User = Depends(get_current_active_user)) -> Optional[Union[CDataObject, GPPDataObject]]:
         """
@@ -366,8 +371,7 @@ class RelayServer(Application):
 
         return None
 
-    def get_meta(self, obj_id: str,
-                 user: User = Depends(get_current_active_user)) -> Optional[Union[CDataObject, GPPDataObject]]:
+    def get_meta(self, obj_id: str) -> Optional[Union[CDataObject, GPPDataObject]]:
         """
         Retrieves the meta information of a data object. Depending on the type of the data object, either a
         `CDataObject` or a `GPPDataObject` is returned, providing meta information for content and GPP data objects,
@@ -409,8 +413,7 @@ class RelayServer(Application):
 
         raise RelayRuntimeError(f"Data object {obj_id} not found.")
 
-    def get_provenance(self, c_hash: str,
-                       user: User = Depends(get_current_active_user)) -> Optional[DataObjectProvenance]:
+    def get_provenance(self, c_hash: str) -> Optional[DataObjectProvenance]:
         """
         Retrieves the provenance information of a data object (identified by its content hash `c_hash`). Provenance
         data includes detailed information how the content of a data object has been produced. In principle, this
@@ -570,7 +573,7 @@ class RelayServer(Application):
                 result.append(node)
         return result
 
-    def deployed(self, user: User = Depends(get_current_active_user)) -> List[Processor]:
+    def deployed(self) -> List[Processor]:
         """
         Retrieves a list of all processors that are deployed by the RTI.
         """
@@ -603,7 +606,7 @@ class RelayServer(Application):
         """
         raise RelayRuntimeError(f"Processor deployment and undeployment not supported by Relay app.")
 
-    def gpp(self, proc_id: str, user: User = Depends(get_current_active_user)) -> GitProcessorPointer:
+    def gpp(self, proc_id: str) -> GitProcessorPointer:
         """
         Retrieves the Git-Processor-Pointer (GPP) information of a deployed processor.
         """
@@ -615,7 +618,7 @@ class RelayServer(Application):
 
         raise RelayRuntimeError(f"Processor {proc_id} not found/deployed.")
 
-    def status(self, proc_id: str, user: User = Depends(get_current_active_user)) -> ProcessorStatus:
+    def status(self, proc_id: str) -> ProcessorStatus:
         """
         Retrieves status information for a deployed processor.
         """
@@ -662,7 +665,7 @@ class RelayServer(Application):
 
         raise RelayRuntimeError(f"Processor {proc_id} not found/deployed.")
 
-    def jobs_by_proc(self, proc_id: str, user: User = Depends(get_current_active_user)) -> List[Job]:
+    def jobs_by_proc(self, proc_id: str) -> List[Job]:
         """
         Retrieves a list of jobs processed by a processor. Any job that is pending execution or actively executed will
         be included in the list. Past jobs, i.e., jobs that have completed execution (successfully or not) will not be
