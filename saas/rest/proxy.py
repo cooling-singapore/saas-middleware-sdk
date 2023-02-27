@@ -100,15 +100,18 @@ class Snapper:
 
 
 class Session:
-    def __init__(self, remote_address: (str, int), credentials: (str, str)) -> None:
+    def __init__(self, remote_address: Union[tuple[str, str, int], tuple[str, int]], credentials: (str, str)) -> None:
         self._remote_address = remote_address
+        self._remote_address = \
+            remote_address if len(remote_address) == 3 else ('http', remote_address[0], remote_address[1])
+
         self._credentials = credentials
 
         self._token = None
         self._expiry = None
 
     @property
-    def address(self) -> (str, int):
+    def address(self) -> (str, str, int):
         return self._remote_address
 
     @property
@@ -134,7 +137,7 @@ class Session:
         return self._token
 
     def _auth_post(self, endpoint: str, data=None) -> dict:
-        url = f"http://{self._remote_address[0]}:{self._remote_address[1]}{endpoint}"
+        url = f"{self._remote_address[0]}://{self._remote_address[1]}:{self._remote_address[2]}{endpoint}"
 
         try:
             response = requests.post(url, data=data)
@@ -145,13 +148,15 @@ class Session:
 
 
 class EndpointProxy:
-    def __init__(self, endpoint_prefix: str, remote_address: (str, int), credentials: (str, str) = None) -> None:
+    def __init__(self, endpoint_prefix: str, remote_address: Union[tuple[str, str, int], tuple[str, int]],
+                 credentials: (str, str) = None) -> None:
         self._endpoint_prefix = endpoint_prefix
-        self._remote_address = remote_address
+        self._remote_address = \
+            remote_address if len(remote_address) == 3 else ('http', remote_address[0], remote_address[1])
         self._session = Session(remote_address, credentials) if credentials else None
 
     @property
-    def remote_address(self) -> (str, int):
+    def remote_address(self) -> (str, str, int):
         return self._remote_address
 
     @property
@@ -257,7 +262,8 @@ class EndpointProxy:
             raise UnsuccessfulConnectionError(url)
 
     def _make_url(self, endpoint: str, parameters: dict = None) -> str:
-        url = f"http://{self._remote_address[0]}:{self._remote_address[1]}{self._endpoint_prefix}{endpoint}"
+        url = f"{self._remote_address[0]}://{self._remote_address[1]}:{self._remote_address[2]}" \
+              f"{self._endpoint_prefix}{endpoint}"
         if parameters:
             eligible = {}
             for k, v in parameters.items():

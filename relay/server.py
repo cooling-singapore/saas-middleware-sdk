@@ -7,13 +7,13 @@ from saas.core.exceptions import ExceptionContent
 from saas.core.helpers import generate_random_string, get_timestamp_now
 from saas.core.identity import Identity
 from saas.core.logging import Logging
-from saas.dor.proxy import DOR_ENDPOINT_PREFIX, DORProxy
+from saas.dor.proxy import DORProxy
 from saas.dor.schemas import CDataObject, GPPDataObject, DataObject, DORStatistics, DataObjectProvenance, \
     GitProcessorPointer, SearchParameters, AddCDataObjectParameters, AddGPPDataObjectParameters
-from saas.nodedb.proxy import DB_ENDPOINT_PREFIX, NodeDBProxy
+from saas.nodedb.proxy import NodeDBProxy
 from saas.nodedb.schemas import NodeInfo
 from saas.rest.schemas import EndpointDefinition
-from saas.rti.proxy import RTI_ENDPOINT_PREFIX, RTIProxy
+from saas.rti.proxy import RTIProxy
 from saas.rti.schemas import Processor, Job, ProcessorStatus, JobStatus, DeployParameters, Task, ReconnectInfo, \
     Permission
 from saas.sdk.app.auth import User
@@ -71,109 +71,112 @@ class RelayServer(Application):
                          __title__, __version__, __description__)
 
         self._job_mapping: Dict[str, NodeInfo] = {}
-        self._proxy_identity: Identity = None
-        self._user_identity: Identity = None
+        self._proxy_identity: Optional[Identity] = None
+        self._user_identity: Optional[Identity] = None
 
     def endpoints(self) -> List[EndpointDefinition]:
         check_if_user = Depends(CheckIfUser(self))
 
+        db_endpoint_prefix = '/relay/v1/db'
+        dor_endpoint_prefix = '/relay/v1/dor'
+        rti_endpoint_prefix = '/relay/v1/rti'
+
         return [
-            EndpointDefinition('GET', DB_ENDPOINT_PREFIX, 'node',
+            EndpointDefinition('GET', db_endpoint_prefix, 'node',
                                self.get_node, NodeInfo, [check_if_user]),
 
-            EndpointDefinition('GET', DB_ENDPOINT_PREFIX, 'network',
+            EndpointDefinition('GET', db_endpoint_prefix, 'network',
                                self.get_network, List[NodeInfo], [check_if_user]),
 
-            EndpointDefinition('GET', DB_ENDPOINT_PREFIX, 'identity/{iid}',
+            EndpointDefinition('GET', db_endpoint_prefix, 'identity/{iid}',
                                self.get_identity, Optional[Identity], [check_if_user]),
 
-            EndpointDefinition('GET', DB_ENDPOINT_PREFIX, 'identity',
+            EndpointDefinition('GET', db_endpoint_prefix, 'identity',
                                self.get_identities, List[Identity], [check_if_user]),
 
-            EndpointDefinition('POST', DB_ENDPOINT_PREFIX, 'identity',
+            EndpointDefinition('POST', db_endpoint_prefix, 'identity',
                                self.update_identity, Identity, [check_if_user]),
 
 
-            EndpointDefinition('GET', DOR_ENDPOINT_PREFIX, '',
+            EndpointDefinition('GET', dor_endpoint_prefix, '',
                                self.search, List[Union[CDataObject, GPPDataObject]], [check_if_user]),
 
-            EndpointDefinition('GET', DOR_ENDPOINT_PREFIX, 'statistics',
+            EndpointDefinition('GET', dor_endpoint_prefix, 'statistics',
                                self.statistics, DORStatistics, [check_if_user]),
 
-            EndpointDefinition('POST', DOR_ENDPOINT_PREFIX, 'add-c',
+            EndpointDefinition('POST', dor_endpoint_prefix, 'add-c',
                                self.add_c, CDataObject, [check_if_user]),
 
-            EndpointDefinition('POST', DOR_ENDPOINT_PREFIX, 'add-gpp',
+            EndpointDefinition('POST', dor_endpoint_prefix, 'add-gpp',
                                self.add_gpp, GPPDataObject, [check_if_user]),
 
-            EndpointDefinition('DELETE', DOR_ENDPOINT_PREFIX, '{obj_id}',
+            EndpointDefinition('DELETE', dor_endpoint_prefix, '{obj_id}',
                                self.remove, Union[CDataObject, GPPDataObject], [check_if_user]),
 
-            EndpointDefinition('GET', DOR_ENDPOINT_PREFIX, '{obj_id}/meta',
+            EndpointDefinition('GET', dor_endpoint_prefix, '{obj_id}/meta',
                                self.get_meta, Optional[Union[CDataObject, GPPDataObject]], [check_if_user]),
 
-            EndpointDefinition('GET', DOR_ENDPOINT_PREFIX, '{obj_id}/content',
+            EndpointDefinition('GET', dor_endpoint_prefix, '{obj_id}/content',
                                self.get_content, None, [check_if_user]),
 
-            EndpointDefinition('GET', DOR_ENDPOINT_PREFIX, '{c_hash}/provenance',
+            EndpointDefinition('GET', dor_endpoint_prefix, '{c_hash}/provenance',
                                self.get_provenance, Optional[DataObjectProvenance], [check_if_user]),
 
-            EndpointDefinition('POST', DOR_ENDPOINT_PREFIX, '{obj_id}/access/{target_user_iid}',
+            EndpointDefinition('POST', dor_endpoint_prefix, '{obj_id}/access/{target_user_iid}',
                                self.grant_access, Union[CDataObject, GPPDataObject], [check_if_user]),
 
-            EndpointDefinition('DELETE', DOR_ENDPOINT_PREFIX, '{obj_id}/access/{target_user_iid}',
+            EndpointDefinition('DELETE', dor_endpoint_prefix, '{obj_id}/access/{target_user_iid}',
                                self.revoke_access, Union[CDataObject, GPPDataObject], [check_if_user]),
 
-            EndpointDefinition('PUT', DOR_ENDPOINT_PREFIX, '{obj_id}/owner/{new_owner_iid}',
+            EndpointDefinition('PUT', dor_endpoint_prefix, '{obj_id}/owner/{new_owner_iid}',
                                self.transfer_ownership, Union[CDataObject, GPPDataObject], [check_if_user]),
 
-            EndpointDefinition('PUT', DOR_ENDPOINT_PREFIX, '{obj_id}/tags',
+            EndpointDefinition('PUT', dor_endpoint_prefix, '{obj_id}/tags',
                                self.update_tags, Union[CDataObject, GPPDataObject],
                                [check_if_user]),
 
-            EndpointDefinition('DELETE', DOR_ENDPOINT_PREFIX, '{obj_id}/tags',
+            EndpointDefinition('DELETE', dor_endpoint_prefix, '{obj_id}/tags',
                                self.remove_tags, Union[CDataObject, GPPDataObject], [check_if_user]),
 
 
-            EndpointDefinition('GET', RTI_ENDPOINT_PREFIX, '',
+            EndpointDefinition('GET', rti_endpoint_prefix, '',
                                self.deployed, List[Processor], [check_if_user]),
 
-            EndpointDefinition('POST', RTI_ENDPOINT_PREFIX, 'proc/{proc_id}',
+            EndpointDefinition('POST', rti_endpoint_prefix, 'proc/{proc_id}',
                                self.deploy, Processor, [check_if_user]),
 
-            EndpointDefinition('DELETE', RTI_ENDPOINT_PREFIX, 'proc/{proc_id}',
+            EndpointDefinition('DELETE', rti_endpoint_prefix, 'proc/{proc_id}',
                                self.undeploy, Processor, [check_if_user]),
 
-            EndpointDefinition('GET', RTI_ENDPOINT_PREFIX, 'proc/{proc_id}/gpp',
+            EndpointDefinition('GET', rti_endpoint_prefix, 'proc/{proc_id}/gpp',
                                self.gpp, GitProcessorPointer, [check_if_user]),
 
-            EndpointDefinition('GET', RTI_ENDPOINT_PREFIX, 'proc/{proc_id}/status',
+            EndpointDefinition('GET', rti_endpoint_prefix, 'proc/{proc_id}/status',
                                self.status, ProcessorStatus, [check_if_user]),
 
-            EndpointDefinition('POST', RTI_ENDPOINT_PREFIX, 'proc/{proc_id}/jobs',
+            EndpointDefinition('POST', rti_endpoint_prefix, 'proc/{proc_id}/jobs',
                                self.submit, Job, [check_if_user]),
 
-            EndpointDefinition('PUT', RTI_ENDPOINT_PREFIX, 'proc/{proc_id}/jobs',
+            EndpointDefinition('PUT', rti_endpoint_prefix, 'proc/{proc_id}/jobs',
                                self.resume, Job, [check_if_user]),
 
-            EndpointDefinition('GET', RTI_ENDPOINT_PREFIX, 'proc/{proc_id}/jobs',
+            EndpointDefinition('GET', rti_endpoint_prefix, 'proc/{proc_id}/jobs',
                                self.jobs_by_proc, List[Job], [check_if_user]),
 
-            EndpointDefinition('GET', RTI_ENDPOINT_PREFIX, 'job',
+            EndpointDefinition('GET', rti_endpoint_prefix, 'job',
                                self.jobs_by_user, List[Job], [check_if_user]),
 
-            EndpointDefinition('GET', RTI_ENDPOINT_PREFIX, 'job/{job_id}/status',
+            EndpointDefinition('GET', rti_endpoint_prefix, 'job/{job_id}/status',
                                self.job_status, JobStatus, [check_if_user]),
 
-            EndpointDefinition('GET', RTI_ENDPOINT_PREFIX, 'job/{job_id}/logs',
+            EndpointDefinition('GET', rti_endpoint_prefix, 'job/{job_id}/logs',
                                self.job_logs, None, [check_if_user]),
 
-            EndpointDefinition('DELETE', RTI_ENDPOINT_PREFIX, 'job/{job_id}',
+            EndpointDefinition('DELETE', rti_endpoint_prefix, 'job/{job_id}',
                                self.job_cancel, JobStatus, [check_if_user]),
 
-            EndpointDefinition('POST', RTI_ENDPOINT_PREFIX, 'permission/{req_id}',
+            EndpointDefinition('POST', rti_endpoint_prefix, 'permission/{req_id}',
                                self.put_permission, None, [check_if_user])
-
         ]
 
     # NodeDB endpoints:

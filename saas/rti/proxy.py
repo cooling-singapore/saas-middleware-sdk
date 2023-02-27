@@ -16,11 +16,13 @@ RTI_ENDPOINT_PREFIX = "/api/v1/rti"
 
 class RTIProxy(EndpointProxy):
     @classmethod
-    def from_session(cls, session: Session) -> RTIProxy:
-        return RTIProxy(remote_address=session.address, credentials=session.credentials)
+    def from_session(cls, session: Session, endpoint_prefix: str = 'api') -> RTIProxy:
+        return RTIProxy(remote_address=session.address, credentials=session.credentials,
+                        endpoint_prefix=f"/{endpoint_prefix}/v1/rti")
 
-    def __init__(self, remote_address: (str, int), credentials: (str, str) = None) -> None:
-        EndpointProxy.__init__(self, RTI_ENDPOINT_PREFIX, remote_address, credentials=credentials)
+    def __init__(self, remote_address: (str, int), credentials: (str, str) = None,
+                 endpoint_prefix: str = RTI_ENDPOINT_PREFIX) -> None:
+        EndpointProxy.__init__(self, endpoint_prefix, remote_address, credentials=credentials)
 
     def get_deployed(self) -> List[Processor]:
         results = self.get(f"")

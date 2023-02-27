@@ -11,7 +11,6 @@ from saas.dor.proxy import DORProxy
 from saas.dor.schemas import DataObject
 from saas.nodedb.proxy import NodeDBProxy
 from saas.rest.exceptions import UnexpectedHTTPError
-from saas.rest.proxy import Session
 from saas.rti.proxy import RTIProxy
 from saas.rti.schemas import Task, JobStatus
 from saas.sdk.app.auth import UserDB, UserAuth
@@ -24,6 +23,10 @@ Logging.initialise(logging.DEBUG)
 logger = Logging.get(__name__)
 
 nextcloud_path = os.path.join(os.environ['HOME'], 'Nextcloud', 'CS', 'CS2.0', 'Pillar DUCT R&D', 'Testing')
+
+db_endpoint_prefix = '/relay/v1/db'
+dor_endpoint_prefix = '/relay/v1/dor'
+rti_endpoint_prefix = '/relay/v1/rti'
 
 
 class RelayServerTestCase(unittest.TestCase):
@@ -95,14 +98,16 @@ class RelayServerTestCase(unittest.TestCase):
 
     def test_get_node(self) -> None:
         try:
-            db = NodeDBProxy(self._server_address, credentials=None)
+            db = NodeDBProxy(self._server_address, credentials=None,
+                             endpoint_prefix=db_endpoint_prefix)
             db.get_node()
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            db = NodeDBProxy(self._server_address, credentials=self._owner_credentials)
+            db = NodeDBProxy(self._server_address, credentials=self._owner_credentials,
+                             endpoint_prefix=db_endpoint_prefix)
             node = db.get_node()
             print(node)
             assert (node is not None)
@@ -112,14 +117,16 @@ class RelayServerTestCase(unittest.TestCase):
 
     def test_get_network(self) -> None:
         try:
-            db = NodeDBProxy(self._server_address, credentials=None)
+            db = NodeDBProxy(self._server_address, credentials=None,
+                             endpoint_prefix=db_endpoint_prefix)
             db.get_network()
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            db = NodeDBProxy(self._server_address, credentials=self._owner_credentials)
+            db = NodeDBProxy(self._server_address, credentials=self._owner_credentials,
+                             endpoint_prefix=db_endpoint_prefix)
             network = db.get_network()
             print(network)
             assert (network is not None)
@@ -129,14 +136,15 @@ class RelayServerTestCase(unittest.TestCase):
 
     def test_get_identity(self) -> None:
         try:
-            db = NodeDBProxy(self._server_address, credentials=None)
+            db = NodeDBProxy(self._server_address, credentials=None, endpoint_prefix=db_endpoint_prefix)
             db.get_identity(self._owner.identity.id)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            db = NodeDBProxy(self._server_address, credentials=self._owner_credentials)
+            db = NodeDBProxy(self._server_address, credentials=self._owner_credentials,
+                             endpoint_prefix=db_endpoint_prefix)
             identity = db.get_identity(self._owner.identity.id)
             print(identity)
             assert (identity is not None)
@@ -147,14 +155,15 @@ class RelayServerTestCase(unittest.TestCase):
 
     def test_get_identities(self) -> None:
         try:
-            db = NodeDBProxy(self._server_address, credentials=None)
+            db = NodeDBProxy(self._server_address, credentials=None, endpoint_prefix=db_endpoint_prefix)
             db.get_identities()
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            db = NodeDBProxy(self._server_address, credentials=self._owner_credentials)
+            db = NodeDBProxy(self._server_address, credentials=self._owner_credentials,
+                             endpoint_prefix=db_endpoint_prefix)
             result = db.get_identities()
             print(result)
             assert (result is not None)
@@ -164,14 +173,15 @@ class RelayServerTestCase(unittest.TestCase):
 
     def test_update_identity(self) -> None:
         try:
-            db = NodeDBProxy(self._server_address, credentials=None)
+            db = NodeDBProxy(self._server_address, credentials=None, endpoint_prefix=db_endpoint_prefix)
             db.update_identity(self._owner.identity)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            db = NodeDBProxy(self._server_address, credentials=self._owner_credentials)
+            db = NodeDBProxy(self._server_address, credentials=self._owner_credentials,
+                             endpoint_prefix=db_endpoint_prefix)
             result = db.update_identity(self._owner.identity)
             print(result)
             assert (result is not None)
@@ -181,14 +191,15 @@ class RelayServerTestCase(unittest.TestCase):
 
     def test_search(self) -> None:
         try:
-            dor = DORProxy(self._server_address, credentials=None)
+            dor = DORProxy(self._server_address, credentials=None, endpoint_prefix=dor_endpoint_prefix)
             dor.search()
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            dor = DORProxy(self._server_address, credentials=self._owner_credentials)
+            dor = DORProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=dor_endpoint_prefix)
             result = dor.search()
             print(result)
             assert (result is not None)
@@ -198,14 +209,15 @@ class RelayServerTestCase(unittest.TestCase):
 
     def test_statistics(self) -> None:
         try:
-            dor = DORProxy(self._server_address, credentials=None)
+            dor = DORProxy(self._server_address, credentials=None, endpoint_prefix=dor_endpoint_prefix)
             dor.statistics()
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            dor = DORProxy(self._server_address, credentials=self._owner_credentials)
+            dor = DORProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=dor_endpoint_prefix)
             result = dor.statistics()
             print(result)
             assert (result is not None)
@@ -220,14 +232,15 @@ class RelayServerTestCase(unittest.TestCase):
 
         # ADD
         try:
-            dor = DORProxy(self._server_address, credentials=None)
+            dor = DORProxy(self._server_address, credentials=None, endpoint_prefix=dor_endpoint_prefix)
             dor.add_data_object(content_path, self._owner.identity, False, False, 'data_type', 'data_format')
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            dor = DORProxy(self._server_address, credentials=self._owner_credentials)
+            dor = DORProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=dor_endpoint_prefix)
             meta = dor.add_data_object(content_path, self._owner.identity, False, False, 'data_type', 'data_format')
             print(meta)
             assert (meta is not None)
@@ -237,14 +250,15 @@ class RelayServerTestCase(unittest.TestCase):
 
         # GET META
         try:
-            dor = DORProxy(self._server_address, credentials=None)
+            dor = DORProxy(self._server_address, credentials=None, endpoint_prefix=dor_endpoint_prefix)
             dor.get_meta(meta.obj_id)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            dor = DORProxy(self._server_address, credentials=self._owner_credentials)
+            dor = DORProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=dor_endpoint_prefix)
             meta = dor.get_meta(meta.obj_id)
             print(meta)
             assert (meta is not None)
@@ -255,14 +269,15 @@ class RelayServerTestCase(unittest.TestCase):
         # GET CONTENT
         download_path = os.path.join(self._wd_path, 'downloaded')
         try:
-            dor = DORProxy(self._server_address, credentials=None)
+            dor = DORProxy(self._server_address, credentials=None, endpoint_prefix=dor_endpoint_prefix)
             dor.get_content(meta.obj_id, with_authorisation_by=self._owner.keystore, download_path=download_path)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            dor = DORProxy(self._server_address, credentials=self._owner_credentials)
+            dor = DORProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=dor_endpoint_prefix)
             dor.get_content(meta.obj_id, with_authorisation_by=self._owner.keystore, download_path=download_path)
             assert (os.path.isfile(download_path))
         except Exception as e:
@@ -271,14 +286,15 @@ class RelayServerTestCase(unittest.TestCase):
 
         # DELETE
         try:
-            dor = DORProxy(self._server_address, credentials=None)
+            dor = DORProxy(self._server_address, credentials=None, endpoint_prefix=dor_endpoint_prefix)
             dor.delete_data_object(meta.obj_id, with_authorisation_by=self._owner.keystore)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            dor = DORProxy(self._server_address, credentials=self._owner_credentials)
+            dor = DORProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=dor_endpoint_prefix)
             meta = dor.delete_data_object(meta.obj_id, with_authorisation_by=self._owner.keystore)
             print(meta)
             assert (meta is not None)
@@ -293,14 +309,15 @@ class RelayServerTestCase(unittest.TestCase):
         proc_config = 'default'
 
         try:
-            dor = DORProxy(self._server_address, credentials=None)
+            dor = DORProxy(self._server_address, credentials=None, endpoint_prefix=dor_endpoint_prefix)
             dor.add_gpp_data_object(source, commit_id, proc_path, proc_config, self._owner.identity)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            dor = DORProxy(self._server_address, credentials=self._owner_credentials)
+            dor = DORProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=dor_endpoint_prefix)
             dor.add_gpp_data_object(source, commit_id, proc_path, proc_config, self._owner.identity)
             assert False
         except SaaSRuntimeException as e:
@@ -312,12 +329,12 @@ class RelayServerTestCase(unittest.TestCase):
         generate_random_file(content_path, 1024*1024)
 
         # ADD
-        dor = DORProxy(self._server_address, credentials=self._owner_credentials)
+        dor = DORProxy(self._server_address, credentials=self._owner_credentials, endpoint_prefix=dor_endpoint_prefix)
         meta = dor.add_data_object(content_path, self._owner.identity, False, False, 'data_type', 'data_format')
 
         # TAG
         try:
-            dor = DORProxy(self._server_address, credentials=None)
+            dor = DORProxy(self._server_address, credentials=None, endpoint_prefix=dor_endpoint_prefix)
             dor.update_tags(meta.obj_id, authority=self._owner.keystore, tags=[
                 DataObject.Tag(key='hello', value='world')
             ])
@@ -326,7 +343,8 @@ class RelayServerTestCase(unittest.TestCase):
             assert e.details['response'].status_code == 401
 
         try:
-            dor = DORProxy(self._server_address, credentials=self._owner_credentials)
+            dor = DORProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=dor_endpoint_prefix)
             meta = dor.update_tags(meta.obj_id, authority=self._owner.keystore, tags=[
                 DataObject.Tag(key='hello', value='world')
             ])
@@ -338,14 +356,15 @@ class RelayServerTestCase(unittest.TestCase):
 
         # UNTAG
         try:
-            dor = DORProxy(self._server_address, credentials=None)
+            dor = DORProxy(self._server_address, credentials=None, endpoint_prefix=dor_endpoint_prefix)
             dor.remove_tags(meta.obj_id, authority=self._owner.keystore, keys=['hello'])
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            dor = DORProxy(self._server_address, credentials=self._owner_credentials)
+            dor = DORProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=dor_endpoint_prefix)
             meta = dor.remove_tags(meta.obj_id, authority=self._owner.keystore, keys=['hello'])
             print(meta)
             assert (meta is not None)
@@ -355,14 +374,15 @@ class RelayServerTestCase(unittest.TestCase):
 
         # GRANT
         try:
-            dor = DORProxy(self._server_address, credentials=None)
+            dor = DORProxy(self._server_address, credentials=None, endpoint_prefix=dor_endpoint_prefix)
             dor.grant_access(meta.obj_id, authority=self._owner.keystore, identity=self._user.identity)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            dor = DORProxy(self._server_address, credentials=self._owner_credentials)
+            dor = DORProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=dor_endpoint_prefix)
             meta = dor.grant_access(meta.obj_id, authority=self._owner.keystore, identity=self._user.identity)
             print(meta)
             assert (meta is not None)
@@ -373,14 +393,15 @@ class RelayServerTestCase(unittest.TestCase):
 
         # REVOKE
         try:
-            dor = DORProxy(self._server_address, credentials=None)
+            dor = DORProxy(self._server_address, credentials=None, endpoint_prefix=dor_endpoint_prefix)
             dor.revoke_access(meta.obj_id, authority=self._owner.keystore, identity=self._user.identity)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            dor = DORProxy(self._server_address, credentials=self._owner_credentials)
+            dor = DORProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=dor_endpoint_prefix)
             meta = dor.revoke_access(meta.obj_id, authority=self._owner.keystore, identity=self._user.identity)
             assert (meta is not None)
         except Exception as e:
@@ -389,14 +410,15 @@ class RelayServerTestCase(unittest.TestCase):
 
         # TRANSFER
         try:
-            dor = DORProxy(self._server_address, credentials=None)
+            dor = DORProxy(self._server_address, credentials=None, endpoint_prefix=dor_endpoint_prefix)
             dor.transfer_ownership(meta.obj_id, authority=self._owner.keystore, new_owner=self._user.identity)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            dor = DORProxy(self._server_address, credentials=self._owner_credentials)
+            dor = DORProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=dor_endpoint_prefix)
             meta = dor.transfer_ownership(meta.obj_id, authority=self._owner.keystore, new_owner=self._user.identity)
             print(meta)
             assert (meta is not None)
@@ -405,19 +427,20 @@ class RelayServerTestCase(unittest.TestCase):
             print(e)
             assert False
 
-        dor = DORProxy(self._server_address, credentials=self._user_credentials)
+        dor = DORProxy(self._server_address, credentials=self._user_credentials, endpoint_prefix=dor_endpoint_prefix)
         dor.delete_data_object(meta.obj_id, with_authorisation_by=self._user.keystore)
 
     def test_deployed(self) -> None:
         try:
-            rti = RTIProxy(self._server_address, credentials=None)
+            rti = RTIProxy(self._server_address, credentials=None, endpoint_prefix=rti_endpoint_prefix)
             rti.get_deployed()
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            rti = RTIProxy(self._server_address, credentials=self._owner_credentials)
+            rti = RTIProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=rti_endpoint_prefix)
             result = rti.get_deployed()
             print(result)
             assert (result is not None)
@@ -427,14 +450,15 @@ class RelayServerTestCase(unittest.TestCase):
 
     def test_deploy(self) -> None:
         try:
-            rti = RTIProxy(self._server_address, credentials=None)
+            rti = RTIProxy(self._server_address, credentials=None, endpoint_prefix=rti_endpoint_prefix)
             rti.deploy(self._gpp.meta.obj_id, authority=self._owner.keystore)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            rti = RTIProxy(self._server_address, credentials=self._owner_credentials)
+            rti = RTIProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=rti_endpoint_prefix)
             rti.deploy(self._gpp.meta.obj_id, authority=self._owner.keystore)
             assert False
         except SaaSRuntimeException as e:
@@ -442,14 +466,15 @@ class RelayServerTestCase(unittest.TestCase):
 
     def test_undeploy(self) -> None:
         try:
-            rti = RTIProxy(self._server_address, credentials=None)
+            rti = RTIProxy(self._server_address, credentials=None, endpoint_prefix=rti_endpoint_prefix)
             rti.undeploy(self._gpp.meta.obj_id, authority=self._owner.keystore)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            rti = RTIProxy(self._server_address, credentials=self._owner_credentials)
+            rti = RTIProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=rti_endpoint_prefix)
             rti.undeploy(self._gpp.meta.obj_id, authority=self._owner.keystore)
             assert False
         except SaaSRuntimeException as e:
@@ -457,14 +482,15 @@ class RelayServerTestCase(unittest.TestCase):
 
     def test_gpp(self) -> None:
         try:
-            rti = RTIProxy(self._server_address, credentials=None)
+            rti = RTIProxy(self._server_address, credentials=None, endpoint_prefix=rti_endpoint_prefix)
             rti.get_gpp(self._gpp.meta.obj_id)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            rti = RTIProxy(self._server_address, credentials=self._owner_credentials)
+            rti = RTIProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=rti_endpoint_prefix)
             result = rti.get_gpp(self._gpp.meta.obj_id)
             print(result)
             assert (result is not None)
@@ -474,14 +500,15 @@ class RelayServerTestCase(unittest.TestCase):
 
     def test_status(self) -> None:
         try:
-            rti = RTIProxy(self._server_address, credentials=None)
+            rti = RTIProxy(self._server_address, credentials=None, endpoint_prefix=rti_endpoint_prefix)
             rti.get_status(self._gpp.meta.obj_id)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            rti = RTIProxy(self._server_address, credentials=self._owner_credentials)
+            rti = RTIProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=rti_endpoint_prefix)
             result = rti.get_status(self._gpp.meta.obj_id)
             print(result)
             assert (result is not None)
@@ -503,14 +530,15 @@ class RelayServerTestCase(unittest.TestCase):
 
         # SUBMIT
         try:
-            rti = RTIProxy(self._server_address, credentials=None)
+            rti = RTIProxy(self._server_address, credentials=None, endpoint_prefix=rti_endpoint_prefix)
             rti.submit_job(self._proc.descriptor.proc_id, task_input, task_output, self._owner.keystore)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            rti = RTIProxy(self._server_address, credentials=self._owner_credentials)
+            rti = RTIProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=rti_endpoint_prefix)
             result = rti.submit_job(self._proc.descriptor.proc_id, task_input, task_output, self._owner.keystore)
             print(result)
             assert (result is not None)
@@ -521,14 +549,15 @@ class RelayServerTestCase(unittest.TestCase):
 
         # STATUS
         try:
-            rti = RTIProxy(self._server_address, credentials=None)
+            rti = RTIProxy(self._server_address, credentials=None, endpoint_prefix=rti_endpoint_prefix)
             rti.get_job_status(job_id, with_authorisation_by=self._owner.keystore)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            rti = RTIProxy(self._server_address, credentials=self._owner_credentials)
+            rti = RTIProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=rti_endpoint_prefix)
             result = rti.get_job_status(job_id, with_authorisation_by=self._owner.keystore)
             print(result)
             assert (result is not None)
@@ -553,14 +582,15 @@ class RelayServerTestCase(unittest.TestCase):
         # LOGS
         logs_path = os.path.join(self._wd_path, 'logs')
         try:
-            rti = RTIProxy(self._server_address, credentials=None)
+            rti = RTIProxy(self._server_address, credentials=None, endpoint_prefix=rti_endpoint_prefix)
             rti.get_job_logs(job_id, with_authorisation_by=self._owner.keystore, download_path=logs_path)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            rti = RTIProxy(self._server_address, credentials=self._owner_credentials)
+            rti = RTIProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=rti_endpoint_prefix)
             rti.get_job_logs(job_id, with_authorisation_by=self._owner.keystore, download_path=logs_path)
             assert (os.path.isfile(logs_path))
         except Exception as e:
@@ -569,14 +599,15 @@ class RelayServerTestCase(unittest.TestCase):
 
         # PROVENANCE
         try:
-            dor = DORProxy(self._server_address, credentials=None)
+            dor = DORProxy(self._server_address, credentials=None, endpoint_prefix=dor_endpoint_prefix)
             dor.get_provenance(obj.c_hash)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            dor = DORProxy(self._server_address, credentials=self._owner_credentials)
+            dor = DORProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=dor_endpoint_prefix)
             result = dor.get_provenance(obj.c_hash)
             print(result)
             assert(result is not None)
@@ -590,14 +621,15 @@ class RelayServerTestCase(unittest.TestCase):
 
     def test_jobs_by_proc(self) -> None:
         try:
-            rti = RTIProxy(self._server_address, credentials=None)
+            rti = RTIProxy(self._server_address, credentials=None, endpoint_prefix=rti_endpoint_prefix)
             rti.get_jobs_by_proc(self._gpp.meta.obj_id)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            rti = RTIProxy(self._server_address, credentials=self._owner_credentials)
+            rti = RTIProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=rti_endpoint_prefix)
             result = rti.get_jobs_by_proc(self._gpp.meta.obj_id)
             print(result)
             assert (result is not None)
@@ -607,14 +639,15 @@ class RelayServerTestCase(unittest.TestCase):
 
     def test_jobs_by_user(self) -> None:
         try:
-            rti = RTIProxy(self._server_address, credentials=None)
+            rti = RTIProxy(self._server_address, credentials=None, endpoint_prefix=rti_endpoint_prefix)
             rti.get_jobs_by_user(authority=self._owner.keystore)
             assert False
         except UnexpectedHTTPError as e:
             assert e.details['response'].status_code == 401
 
         try:
-            rti = RTIProxy(self._server_address, credentials=self._owner_credentials)
+            rti = RTIProxy(self._server_address, credentials=self._owner_credentials,
+                           endpoint_prefix=rti_endpoint_prefix)
             result = rti.get_jobs_by_user(authority=self._owner.keystore)
             print(result)
             assert (result is not None)
@@ -649,6 +682,16 @@ class RelayServerTestCase(unittest.TestCase):
                 c = read_json_from_file(download_path)
                 c = c['v']
                 print(f"{a} + {b} = {c}")
+
+        context.close()
+
+    def test_sdk_remote(self) -> None:
+        context: SDKRelayContext = connect_to_relay(self._wd_path,
+                                                    relay_address=('https', 'api-dev.duct.sg', 443),
+                                                    credentials=('foo.bar@somewhere.com', '105PFvIg'))
+
+        result = context.find_processors()
+        print(result)
 
         context.close()
 

@@ -34,7 +34,7 @@ class SDKProcessor:
     def __init__(self, processor: Processor, authority: Keystore, node: NodeInfo, session: Session = None) -> None:
         self._processor = processor
         self._authority = authority
-        self._rti = RTIProxy.from_session(session) if session else RTIProxy(node.rest_address)
+        self._rti = RTIProxy.from_session(session, endpoint_prefix='relay') if session else RTIProxy(node.rest_address)
         self._node = node
         self._session = session
 
@@ -140,7 +140,8 @@ class SDKDataObject:
         self._meta = meta
         self._authority = authority
         self._session = session
-        self._dor = DORProxy.from_session(session) if session else DORProxy(meta.custodian.rest_address)
+        self._dor = DORProxy.from_session(session, endpoint_prefix='relay') \
+            if session else DORProxy(meta.custodian.rest_address)
 
     def delete(self) -> Union[CDataObject, GPPDataObject]:
         return self._dor.delete_data_object(self._meta.obj_id, self._authority)
@@ -189,7 +190,8 @@ class SDKGPPDataObject(SDKDataObject):
         github_credentials = self._authority.github_credentials.get(self.meta.gpp.source)
 
         # try to deploy the processor
-        rti = RTIProxy.from_session(self._session) if self._session else RTIProxy(node.rest_address)
+        rti = RTIProxy.from_session(self._session, endpoint_prefix='relay') \
+            if self._session else RTIProxy(node.rest_address)
         proc = rti.deploy(self.meta.obj_id, self._authority, gpp_custodian=self.meta.custodian.identity.id,
                           ssh_credentials=ssh_credentials, github_credentials=github_credentials)
 
@@ -223,7 +225,8 @@ class SDKJob:
         self._proc = proc
         self._job = job
         self._authority = authority
-        self._rti = RTIProxy.from_session(session) if session else RTIProxy(job.custodian.rest_address)
+        self._rti = RTIProxy.from_session(session, endpoint_prefix='relay') \
+            if session else RTIProxy(job.custodian.rest_address)
         self._status = None
         self._session = session
 
@@ -526,7 +529,7 @@ class SDKRelayContext:
                        license_sa: bool = False, license_nc: bool = False, license_nd: bool = False) -> SDKCDataObject:
 
         # upload data object to DOR
-        dor = DORProxy.from_session(self._session)
+        dor = DORProxy.from_session(self._session, endpoint_prefix='relay')
         meta = dor.add_data_object(content_path, self._authority.identity, access_restricted, content_encrypted,
                                    data_type, data_format, creators=creators, license_by=license_by,
                                    license_sa=license_sa, license_nc=license_nc, license_nd=license_nd)
@@ -534,14 +537,14 @@ class SDKRelayContext:
         return SDKCDataObject(meta, self._authority, self._session)
 
     def find_processor_by_id(self, proc_id: str) -> Optional[SDKProcessor]:
-        rti = RTIProxy.from_session(self._session)
+        rti = RTIProxy.from_session(self._session, endpoint_prefix='relay')
         for proc in rti.get_deployed():
             if proc.proc_id == proc_id:
                 return SDKProcessor(proc, self._authority, self._node, self._session)
         return None
 
     def find_processor_by_name(self, proc_name: str) -> Optional[SDKProcessor]:
-        rti = RTIProxy.from_session(self._session)
+        rti = RTIProxy.from_session(self._session, endpoint_prefix='relay')
         for proc in rti.get_deployed():
             if proc.gpp.proc_descriptor.name == proc_name:
                 return SDKProcessor(proc, self._authority, self._node, self._session)
@@ -549,14 +552,14 @@ class SDKRelayContext:
 
     def find_processors(self, pattern: str = None) -> List[SDKProcessor]:
         result = []
-        rti = RTIProxy.from_session(self._session)
+        rti = RTIProxy.from_session(self._session, endpoint_prefix='relay')
         for proc in rti.get_deployed():
             if not pattern or pattern in proc.gpp.proc_descriptor.name:
                 result.append(SDKProcessor(proc, self._authority, self._node, self._session))
         return result
 
     def find_data_object(self, obj_id: str) -> Optional[Union[SDKCDataObject, SDKGPPDataObject]]:
-        dor = DORProxy.from_session(self._session)
+        dor = DORProxy.from_session(self._session, endpoint_prefix='relay')
         meta = dor.get_meta(obj_id)
         if meta:
             if isinstance(meta, CDataObject):
@@ -571,7 +574,7 @@ class SDKRelayContext:
                                                                                              SDKGPPDataObject]]:
 
         result = []
-        dor = DORProxy.from_session(self._session)
+        dor = DORProxy.from_session(self._session, endpoint_prefix='relay')
         for meta in dor.search(patterns=patterns, owner_iid=owner_iid, data_type=data_type,
                                data_format=data_format, c_hashes=c_hashes):
 
@@ -583,7 +586,7 @@ class SDKRelayContext:
 
     def find_all_jobs_with_status(self) -> List[SDKJob]:
         results = []
-        rti = RTIProxy.from_session(self._session)
+        rti = RTIProxy.from_session(self._session, endpoint_prefix='relay')
         jobs = rti.get_jobs_by_user(self._authority)
         for job in jobs:
             # get the corresponding processor
@@ -596,7 +599,7 @@ class SDKRelayContext:
         return results
 
     def find_job(self, job_id) -> Optional[SDKJob]:
-        rti = RTIProxy.from_session(self._session)
+        rti = RTIProxy.from_session(self._session, endpoint_prefix='relay')
         jobs = rti.get_jobs_by_user(self._authority)
         for job in jobs:
             # does the job id match?
@@ -616,14 +619,14 @@ class SDKRelayContext:
         return None
 
     def publish_identity(self, identity: Identity) -> None:
-        db = NodeDBProxy.from_session(self._session)
+        db = NodeDBProxy.from_session(self._session, endpoint_prefix='relay')
         db.update_identity(identity)
 
 
 def connect_to_relay(wd_path: str, relay_address: (str, int), credentials: (str, str)) -> SDKRelayContext:
     # connect to the node and get info about it
     session = Session(remote_address=relay_address, credentials=credentials)
-    db = NodeDBProxy.from_session(session)
+    db = NodeDBProxy.from_session(session, endpoint_prefix='relay')
     node = db.get_node()
 
     # create an ephemeral keystore that is only used for the Relay

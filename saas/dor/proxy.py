@@ -13,11 +13,13 @@ DOR_ENDPOINT_PREFIX = "/api/v1/dor"
 
 class DORProxy(EndpointProxy):
     @classmethod
-    def from_session(cls, session: Session) -> DORProxy:
-        return DORProxy(remote_address=session.address, credentials=session.credentials)
+    def from_session(cls, session: Session, endpoint_prefix: str = 'api') -> DORProxy:
+        return DORProxy(remote_address=session.address, credentials=session.credentials,
+                        endpoint_prefix=f"/{endpoint_prefix}/v1/dor")
 
-    def __init__(self, remote_address: (str, int), credentials: (str, str) = None):
-        super().__init__(DOR_ENDPOINT_PREFIX, remote_address, credentials=credentials)
+    def __init__(self, remote_address: (str, int), credentials: (str, str) = None,
+                 endpoint_prefix: str = DOR_ENDPOINT_PREFIX):
+        super().__init__(endpoint_prefix, remote_address, credentials=credentials)
 
     def search(self, patterns: list[str] = None, owner_iid: str = None,
                data_type: str = None, data_format: str = None,

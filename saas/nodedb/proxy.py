@@ -11,11 +11,13 @@ DB_ENDPOINT_PREFIX = "/api/v1/db"
 
 class NodeDBProxy(EndpointProxy):
     @classmethod
-    def from_session(cls, session: Session) -> NodeDBProxy:
-        return NodeDBProxy(remote_address=session.address, credentials=session.credentials)
+    def from_session(cls, session: Session, endpoint_prefix: str = 'api') -> NodeDBProxy:
+        return NodeDBProxy(remote_address=session.address, credentials=session.credentials,
+                           endpoint_prefix=f"/{endpoint_prefix}/v1/db")
 
-    def __init__(self, remote_address: (str, int), credentials: (str, str) = None):
-        EndpointProxy.__init__(self, DB_ENDPOINT_PREFIX, remote_address, credentials=credentials)
+    def __init__(self, remote_address: (str, int), credentials: (str, str) = None,
+                 endpoint_prefix: str = DB_ENDPOINT_PREFIX):
+        EndpointProxy.__init__(self, endpoint_prefix, remote_address, credentials=credentials)
 
     def get_node(self) -> NodeInfo:
         result = self.get("/node")
