@@ -31,9 +31,9 @@ class SDKProductSpecification(BaseModel):
 
 
 class SDKProcessor:
-    def __init__(self, processor: Processor, user: Keystore, node: NodeInfo, session: Session = None) -> None:
+    def __init__(self, processor: Processor, authority: Keystore, node: NodeInfo, session: Session = None) -> None:
         self._processor = processor
-        self._user = user
+        self._authority = authority
         self._rti = RTIProxy.from_session(session) if session else RTIProxy(node.rest_address)
         self._node = node
         self._session = session
@@ -47,7 +47,7 @@ class SDKProcessor:
         return self._processor
 
     def undeploy(self) -> None:
-        self._rti.undeploy(self._processor.proc_id, self._user)
+        self._rti.undeploy(self._processor.proc_id, self._authority)
 
     def status(self) -> ProcessorStatus:
         return self._rti.get_status(self._processor.proc_id)
@@ -69,7 +69,7 @@ class SDKProcessor:
                 meta = consume_specs[obj_desc.name].meta
 
                 # create a signature (if needed)
-                signature = self._user.sign(f"{self._node.identity.id}:{meta.obj_id}".encode('utf-8')) if \
+                signature = self._authority.sign(f"{self._node.identity.id}:{meta.obj_id}".encode('utf-8')) if \
                     meta.access_restricted else None
 
                 job_input.append(Task.InputReference(
@@ -97,7 +97,7 @@ class SDKProcessor:
         default_restricted_access = False
         default_content_encrypted = False
         default_target_node_iid = self._node.identity.id
-        default_owner_iid = self._user.identity.id
+        default_owner_iid = self._authority.identity.id
 
         # process produced objects
         job_output = []
@@ -122,9 +122,10 @@ class SDKProcessor:
             ))
 
         # try to submit the job
-        job: Job = self._rti.submit_job(self._processor.proc_id, job_input, job_output, self._user,
+        job: Job = self._rti.submit_job(self._processor.proc_id, job_input, job_output,
+                                        with_authorisation_by=self._authority,
                                         name=name, description=description)
-        return SDKJob(self, job, self._user)
+        return SDKJob(self, job, self._authority, self._session)
 
     def submit_and_wait(self, consume_specs: Dict[str, Union[SDKCDataObject, Dict]],
                         product_specs: Dict[str, SDKProductSpecification] = None) -> Dict[str, SDKCDataObject]:
@@ -135,34 +136,34 @@ class SDKProcessor:
 
 
 class SDKDataObject:
-    def __init__(self, meta: Union[CDataObject, GPPDataObject], user: Keystore, session: Session) -> None:
+    def __init__(self, meta: Union[CDataObject, GPPDataObject], authority: Keystore, session: Session) -> None:
         self._meta = meta
-        self._user = user
+        self._authority = authority
         self._session = session
         self._dor = DORProxy.from_session(session) if session else DORProxy(meta.custodian.rest_address)
 
     def delete(self) -> Union[CDataObject, GPPDataObject]:
-        return self._dor.delete_data_object(self._meta.obj_id, self._user)
+        return self._dor.delete_data_object(self._meta.obj_id, self._authority)
 
     def grant_access(self, identity: Identity) -> None:
-        self._meta = self._dor.grant_access(self._meta.obj_id, self._user, identity)
+        self._meta = self._dor.grant_access(self._meta.obj_id, self._authority, identity)
 
     def revoke_access(self, identity: Identity) -> None:
-        self._meta = self._dor.revoke_access(self._meta.obj_id, self._user, identity)
+        self._meta = self._dor.revoke_access(self._meta.obj_id, self._authority, identity)
 
     def transfer_ownership(self, new_owner: Identity) -> None:
-        self._meta = self._dor.transfer_ownership(self._meta.obj_id, self._user, new_owner)
+        self._meta = self._dor.transfer_ownership(self._meta.obj_id, self._authority, new_owner)
 
     def update_tags(self, tags: List[DataObject.Tag]) -> None:
-        self._meta = self._dor.update_tags(self._meta.obj_id, self._user, tags)
+        self._meta = self._dor.update_tags(self._meta.obj_id, self._authority, tags)
 
     def remove_tags(self, keys: List[str]) -> None:
-        self._meta = self._dor.remove_tags(self._meta.obj_id, self._user, keys)
+        self._meta = self._dor.remove_tags(self._meta.obj_id, self._authority, keys)
 
 
 class SDKGPPDataObject(SDKDataObject):
-    def __init__(self, meta: GPPDataObject, user: Keystore, session: Session = None) -> None:
-        super().__init__(meta, user, session)
+    def __init__(self, meta: GPPDataObject, authority: Keystore, session: Session = None) -> None:
+        super().__init__(meta, authority, session)
 
     @property
     def meta(self) -> GPPDataObject:
@@ -178,26 +179,26 @@ class SDKGPPDataObject(SDKDataObject):
         # do we have SSH credentials for this profile (if applicable)
         ssh_credentials = None
         if ssh_profile:
-            ssh_credentials = self._user.ssh_credentials.get(ssh_profile)
+            ssh_credentials = self._authority.ssh_credentials.get(ssh_profile)
             if not ssh_credentials:
                 raise SaaSRuntimeException("No SSH credentials found for profile", details={
                     'profile': ssh_profile
                 })
 
         # do we have GitHub credentials for this repo?
-        github_credentials = self._user.github_credentials.get(self.meta.gpp.source)
+        github_credentials = self._authority.github_credentials.get(self.meta.gpp.source)
 
         # try to deploy the processor
         rti = RTIProxy.from_session(self._session) if self._session else RTIProxy(node.rest_address)
-        proc = rti.deploy(self.meta.obj_id, self._user, gpp_custodian=self.meta.custodian.identity.id,
+        proc = rti.deploy(self.meta.obj_id, self._authority, gpp_custodian=self.meta.custodian.identity.id,
                           ssh_credentials=ssh_credentials, github_credentials=github_credentials)
 
-        return SDKProcessor(proc, self._user, node)
+        return SDKProcessor(proc, self._authority, node, self._session)
 
 
 class SDKCDataObject(SDKDataObject):
-    def __init__(self, meta: CDataObject, user: Keystore, session: Session = None) -> None:
-        super().__init__(meta, user, session)
+    def __init__(self, meta: CDataObject, authority: Keystore, session: Session = None) -> None:
+        super().__init__(meta, authority, session)
 
     @property
     def meta(self) -> CDataObject:
@@ -209,7 +210,7 @@ class SDKCDataObject(SDKDataObject):
             download_path = os.path.join(download_path, f"{self.meta.obj_id}.{self.meta.data_format}")
 
         # download the content
-        self._dor.get_content(self._meta.obj_id, self._user, download_path)
+        self._dor.get_content(self._meta.obj_id, self._authority, download_path)
         return download_path
 
     def get_provenance(self) -> DataObjectProvenance:
@@ -217,16 +218,17 @@ class SDKCDataObject(SDKDataObject):
 
 
 class SDKJob:
-    def __init__(self, proc: SDKProcessor, job: Job, user: Keystore, session: Session = None) -> None:
+    def __init__(self, proc: SDKProcessor, job: Job, authority: Keystore, session: Session = None) -> None:
         self._mutex = threading.Lock()
         self._proc = proc
         self._job = job
-        self._user = user
+        self._authority = authority
         self._rti = RTIProxy.from_session(session) if session else RTIProxy(job.custodian.rest_address)
         self._status = None
+        self._session = session
 
     def refresh_status(self) -> bool:
-        status = self._rti.get_job_status(self._job.id, self._user)
+        status = self._rti.get_job_status(self._job.id, self._authority)
         if status:
             with self._mutex:
                 self._status = status
@@ -272,12 +274,13 @@ class SDKJob:
 
         # resume job
         with self._mutex:
-            self._job = self._rti.resume_job(self._proc.descriptor.proc_id, self._job, status.reconnect, self._user)
+            self._job = self._rti.resume_job(self._proc.descriptor.proc_id, self._job, status.reconnect,
+                                             self._authority)
             self._status = None
 
     def cancel(self) -> JobStatus:
         with self._mutex:
-            status = self._rti.cancel_job(self._job.id, self._user)
+            status = self._rti.cancel_job(self._job.id, self._authority)
             return status
 
     def wait(self, pace: float = 1.0, callback_progress: Callable[[int], None] = None) -> Dict[str, SDKCDataObject]:
@@ -303,21 +306,21 @@ class SDKJob:
         # collect information about the output data objects
         output = {}
         for name, meta in status.output.items():
-            output[name] = SDKCDataObject(meta=meta, user=self._user)
+            output[name] = SDKCDataObject(meta=meta, authority=self._authority, session=self._session)
 
         return output
 
 
 class SDKContext:
-    def __init__(self, dor_nodes: List[NodeInfo], rti_nodes: List[NodeInfo], user: Keystore):
+    def __init__(self, dor_nodes: List[NodeInfo], rti_nodes: List[NodeInfo], authority: Keystore):
         self._dor_nodes = {node.identity.id: node for node in dor_nodes}
         self._rti_nodes = {node.identity.id: node for node in rti_nodes}
-        self._user = user
+        self._authority = authority
         self._created = get_timestamp_now()
 
     @property
-    def user(self) -> Keystore:
-        return self._user
+    def authority(self) -> Keystore:
+        return self._authority
 
     @property
     def age(self) -> float:
@@ -363,11 +366,11 @@ class SDKContext:
 
         # upload data object to DOR
         dor = DORProxy(dor.rest_address)
-        meta = dor.add_data_object(content_path, self._user.identity, access_restricted, content_encrypted,
+        meta = dor.add_data_object(content_path, self._authority.identity, access_restricted, content_encrypted,
                                    data_type, data_format, creators=creators, license_by=license_by,
                                    license_sa=license_sa, license_nc=license_nc, license_nd=license_nd)
 
-        return SDKCDataObject(meta, self._user)
+        return SDKCDataObject(meta, self._authority)
 
     def upload_gpp(self, source: str, commit_id: str, proc_path: str, proc_config: str,
                    creators: List[Identity] = None, preferred_dor_iid: str = None) -> SDKGPPDataObject:
@@ -376,21 +379,21 @@ class SDKContext:
         dor = self.dor(preferred_iid=preferred_dor_iid)
 
         # do we have GitHub credentials?
-        github_credentials = self._user.github_credentials.get(source)
+        github_credentials = self._authority.github_credentials.get(source)
 
         # upload data object to DOR
         dor = DORProxy(dor.rest_address)
-        meta = dor.add_gpp_data_object(source, commit_id, proc_path, proc_config, self._user.identity,
+        meta = dor.add_gpp_data_object(source, commit_id, proc_path, proc_config, self._authority.identity,
                                        creators=creators, github_credentials=github_credentials)
 
-        return SDKGPPDataObject(meta, self._user)
+        return SDKGPPDataObject(meta, self._authority)
 
     def find_processor_by_id(self, proc_id: str) -> Optional[SDKProcessor]:
         for node in self._rti_nodes.values():
             rti = RTIProxy(node.rest_address)
             for proc in rti.get_deployed():
                 if proc.proc_id == proc_id:
-                    return SDKProcessor(proc, self._user, node)
+                    return SDKProcessor(proc, self._authority, node)
         return None
 
     def find_processor_by_name(self, proc_name: str) -> Optional[SDKProcessor]:
@@ -398,7 +401,7 @@ class SDKContext:
             rti = RTIProxy(node.rest_address)
             for proc in rti.get_deployed():
                 if proc.gpp.proc_descriptor.name == proc_name:
-                    return SDKProcessor(proc, self._user, node)
+                    return SDKProcessor(proc, self._authority, node)
         return None
 
     def find_processors(self, pattern: str = None) -> List[SDKProcessor]:
@@ -407,7 +410,7 @@ class SDKContext:
             rti = RTIProxy(node.rest_address)
             for proc in rti.get_deployed():
                 if not pattern or pattern in proc.gpp.proc_descriptor.name:
-                    result.append(SDKProcessor(proc, self._user, node))
+                    result.append(SDKProcessor(proc, self._authority, node))
         return result
 
     def find_data_object(self, obj_id: str) -> Optional[Union[SDKCDataObject, SDKGPPDataObject]]:
@@ -416,9 +419,9 @@ class SDKContext:
             meta = dor.get_meta(obj_id)
             if meta:
                 if isinstance(meta, CDataObject):
-                    return SDKCDataObject(meta, self._user)
+                    return SDKCDataObject(meta, self._authority)
                 else:
-                    return SDKGPPDataObject(meta, self._user)
+                    return SDKGPPDataObject(meta, self._authority)
 
         return None
 
@@ -433,22 +436,22 @@ class SDKContext:
                                    data_format=data_format, c_hashes=c_hashes):
 
                 if isinstance(meta, CDataObject):
-                    result.append(SDKCDataObject(meta, self._user))
+                    result.append(SDKCDataObject(meta, self._authority))
                 else:
-                    result.append(SDKGPPDataObject(meta, self._user))
+                    result.append(SDKGPPDataObject(meta, self._authority))
         return result
 
     def find_all_jobs_with_status(self) -> List[SDKJob]:
         results = []
         for node in self._rti_nodes.values():
             rti = RTIProxy(node.rest_address)
-            jobs = rti.get_jobs_by_user(self._user)
+            jobs = rti.get_jobs_by_user(self._authority)
             for job in jobs:
                 # get the corresponding processor
                 for proc in rti.get_deployed():
                     if proc.proc_id == job.task.proc_id:
-                        proc = SDKProcessor(proc, self._user, node)
-                        results.append(SDKJob(proc, job, self._user))
+                        proc = SDKProcessor(proc, self._authority, node)
+                        results.append(SDKJob(proc, job, self._authority))
                         break
 
         return results
@@ -456,15 +459,15 @@ class SDKContext:
     def find_job(self, job_id) -> Optional[SDKJob]:
         for node in self._rti_nodes.values():
             rti = RTIProxy(node.rest_address)
-            jobs = rti.get_jobs_by_user(self._user)
+            jobs = rti.get_jobs_by_user(self._authority)
             for job in jobs:
                 # does the job id match?
                 if job.id == job_id:
                     # get the corresponding processor
                     for proc in rti.get_deployed():
                         if proc.proc_id == job.task.proc_id:
-                            proc = SDKProcessor(proc, self._user, node)
-                            return SDKJob(proc, job, self._user)
+                            proc = SDKProcessor(proc, self._authority, node)
+                            return SDKJob(proc, job, self._authority)
 
                     # if we get here then we haven't been able to find the processor for this job
                     raise SaaSRuntimeException(f"No processor deployed for job", details={
@@ -490,9 +493,9 @@ def publish_identity(address: (str, int), identity: Identity) -> None:
     db.update_identity(identity)
 
 
-def connect(address: (str, int), user: Keystore) -> SDKContext:
+def connect(address: (str, int), authority: Keystore) -> SDKContext:
     # publish the user identity (may not be needed but just to be sure)
-    publish_identity(address, user.identity)
+    publish_identity(address, authority.identity)
 
     # fetch information about the network
     db = NodeDBProxy(address)
@@ -505,20 +508,18 @@ def connect(address: (str, int), user: Keystore) -> SDKContext:
         if node.dor_service:
             dor_nodes.append(node)
 
-    return SDKContext(dor_nodes, rti_nodes, user)
+    return SDKContext(dor_nodes, rti_nodes, authority)
 
 
 class SDKRelayContext:
-    def __init__(self, user_keystore: Keystore, session: Session):
-        self._user = user_keystore
+    def __init__(self, session: Session, authority: Keystore, node: NodeInfo):
+        self._authority = authority
         self._session = session
+        self._node = node
 
-        db = NodeDBProxy.from_session(session)
-        self._node = db.get_node()
-
-    @property
-    def user(self) -> Keystore:
-        return self._user
+    def close(self) -> None:
+        # delete the ephemeral keystore
+        os.remove(self._authority.path)
 
     def upload_content(self, content_path: str, data_type: str, data_format: str, access_restricted: bool,
                        content_encrypted: bool = False, creators: List[Identity] = None, license_by: bool = False,
@@ -526,24 +527,24 @@ class SDKRelayContext:
 
         # upload data object to DOR
         dor = DORProxy.from_session(self._session)
-        meta = dor.add_data_object(content_path, self._user.identity, access_restricted, content_encrypted,
+        meta = dor.add_data_object(content_path, self._authority.identity, access_restricted, content_encrypted,
                                    data_type, data_format, creators=creators, license_by=license_by,
                                    license_sa=license_sa, license_nc=license_nc, license_nd=license_nd)
 
-        return SDKCDataObject(meta, self._user, self._session)
+        return SDKCDataObject(meta, self._authority, self._session)
 
     def find_processor_by_id(self, proc_id: str) -> Optional[SDKProcessor]:
         rti = RTIProxy.from_session(self._session)
         for proc in rti.get_deployed():
             if proc.proc_id == proc_id:
-                return SDKProcessor(proc, self._user, self._node, self._session)
+                return SDKProcessor(proc, self._authority, self._node, self._session)
         return None
 
     def find_processor_by_name(self, proc_name: str) -> Optional[SDKProcessor]:
         rti = RTIProxy.from_session(self._session)
         for proc in rti.get_deployed():
             if proc.gpp.proc_descriptor.name == proc_name:
-                return SDKProcessor(proc, self._user, self._node, self._session)
+                return SDKProcessor(proc, self._authority, self._node, self._session)
         return None
 
     def find_processors(self, pattern: str = None) -> List[SDKProcessor]:
@@ -551,7 +552,7 @@ class SDKRelayContext:
         rti = RTIProxy.from_session(self._session)
         for proc in rti.get_deployed():
             if not pattern or pattern in proc.gpp.proc_descriptor.name:
-                result.append(SDKProcessor(proc, self._user, self._node, self._session))
+                result.append(SDKProcessor(proc, self._authority, self._node, self._session))
         return result
 
     def find_data_object(self, obj_id: str) -> Optional[Union[SDKCDataObject, SDKGPPDataObject]]:
@@ -559,9 +560,9 @@ class SDKRelayContext:
         meta = dor.get_meta(obj_id)
         if meta:
             if isinstance(meta, CDataObject):
-                return SDKCDataObject(meta, self._user, self._session)
+                return SDKCDataObject(meta, self._authority, self._session)
             else:
-                return SDKGPPDataObject(meta, self._user, self._session)
+                return SDKGPPDataObject(meta, self._authority, self._session)
 
         return None
 
@@ -575,36 +576,36 @@ class SDKRelayContext:
                                data_format=data_format, c_hashes=c_hashes):
 
             if isinstance(meta, CDataObject):
-                result.append(SDKCDataObject(meta, self._user, self._session))
+                result.append(SDKCDataObject(meta, self._authority, self._session))
             else:
-                result.append(SDKGPPDataObject(meta, self._user, self._session))
+                result.append(SDKGPPDataObject(meta, self._authority, self._session))
         return result
 
     def find_all_jobs_with_status(self) -> List[SDKJob]:
         results = []
         rti = RTIProxy.from_session(self._session)
-        jobs = rti.get_jobs_by_user(self._user)
+        jobs = rti.get_jobs_by_user(self._authority)
         for job in jobs:
             # get the corresponding processor
             for proc in rti.get_deployed():
                 if proc.proc_id == job.task.proc_id:
-                    proc = SDKProcessor(proc, self._user, self._node, self._session)
-                    results.append(SDKJob(proc, job, self._user, self._session))
+                    proc = SDKProcessor(proc, self._authority, self._node, self._session)
+                    results.append(SDKJob(proc, job, self._authority, self._session))
                     break
 
         return results
 
     def find_job(self, job_id) -> Optional[SDKJob]:
         rti = RTIProxy.from_session(self._session)
-        jobs = rti.get_jobs_by_user(self._user)
+        jobs = rti.get_jobs_by_user(self._authority)
         for job in jobs:
             # does the job id match?
             if job.id == job_id:
                 # get the corresponding processor
                 for proc in rti.get_deployed():
                     if proc.proc_id == job.task.proc_id:
-                        proc = SDKProcessor(proc, self._user, self._node, self._session)
-                        return SDKJob(proc, job, self._user, self._session)
+                        proc = SDKProcessor(proc, self._authority, self._node, self._session)
+                        return SDKJob(proc, job, self._authority, self._session)
 
                 # if we get here then we haven't been able to find the processor for this job
                 raise SaaSRuntimeException(f"No processor deployed for job", details={
@@ -619,9 +620,17 @@ class SDKRelayContext:
         db.update_identity(identity)
 
 
-def connect_to_relay(session: Session, user_keystore: Keystore) -> SDKRelayContext:
-    # publish the user identity (may not be needed but just to be sure)
+def connect_to_relay(wd_path: str, relay_address: (str, int), credentials: (str, str)) -> SDKRelayContext:
+    # connect to the node and get info about it
+    session = Session(remote_address=relay_address, credentials=credentials)
     db = NodeDBProxy.from_session(session)
-    db.update_identity(user_keystore.identity)
+    node = db.get_node()
 
-    return SDKRelayContext(user_keystore, session)
+    # create an ephemeral keystore that is only used for the Relay
+    authority = Keystore.create(wd_path, f"relay_proxy:{session.credentials[0]}", 'none', session.credentials[1])
+    user_identity = db.update_identity(authority.identity)
+
+    print(f"Using ephemeral identity: {authority.identity.id}")
+    print(f"Actual user identity: {user_identity.id}")
+
+    return SDKRelayContext(session, authority, node)

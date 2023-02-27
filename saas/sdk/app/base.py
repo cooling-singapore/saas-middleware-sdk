@@ -137,7 +137,7 @@ class Application(abc.ABC):
                 for key in list(self._context.keys()):
                     context = self._context[key]
                     if context.age > expiry:
-                        logger.debug(f"[context_invalidator] context expired: {context.user}")
+                        logger.debug(f"[context_invalidator] context expired: {context.authority}")
                         self._context.pop(key)
 
     def _get_context(self, user: User) -> SDKContext:

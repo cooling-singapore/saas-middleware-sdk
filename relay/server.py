@@ -71,6 +71,8 @@ class RelayServer(Application):
                          __title__, __version__, __description__)
 
         self._job_mapping: Dict[str, NodeInfo] = {}
+        self._proxy_identity: Identity = None
+        self._user_identity: Identity = None
 
     def endpoints(self) -> List[EndpointDefinition]:
         check_if_user = Depends(CheckIfUser(self))
@@ -196,9 +198,13 @@ class RelayServer(Application):
         """
         Retrieves the identity given its id (if the node db knows about it).
         """
-        proxy = NodeDBProxy(self._node_address)
-        result = proxy.get_identity(iid)
-        return result
+        # if it's the iid of the Relay proxy identity, return the proxy
+        if self._proxy_identity and iid == self._proxy_identity.id:
+            return self._proxy_identity
+        else:
+            proxy = NodeDBProxy(self._node_address)
+            result = proxy.get_identity(iid)
+            return result
 
     def get_identities(self) -> List[Identity]:
         """
@@ -639,6 +645,25 @@ class RelayServer(Application):
             rti = RTIProxy(node.rest_address)
             for proc in rti.get_deployed():
                 if proc.proc_id == proc_id:
+                    # update the references to the users' identity
+                    for i in task.input:
+                        if isinstance(i, Task.InputReference):
+                            # do we need a user signature? verify against the proxy identity and recreate using the
+                            # users' actual identity
+                            if i.user_signature:
+                                message = f"{node.identity.id}:{i.obj_id}".encode('utf-8')
+                                if not self._proxy_identity.verify(message, i.user_signature):
+                                    raise  RelayRuntimeError(f"Signature verification failed for task input reference: "
+                                                             f"{i.name}")
+
+                                # update with new signature
+                                i.user_signature = user.keystore.sign(f"{node.identity.id}:{i.obj_id}".encode('utf-8'))
+
+                    # update output owners
+                    for o in task.output:
+                        if o.owner_iid == self._proxy_identity.id:
+                            o.owner_iid = user.identity.id
+
                     job = rti.submit_job(proc_id, job_input=task.input, job_output=task.output,
                                          with_authorisation_by=user.keystore, name=task.name,
                                          description=task.description)

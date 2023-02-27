@@ -629,9 +629,7 @@ class RelayServerTestCase(unittest.TestCase):
         pass
 
     def test_sdk(self) -> None:
-        session = Session(self._server_address, self._user_credentials)
-
-        context: SDKRelayContext = connect_to_relay(session, self._user.keystore)
+        context: SDKRelayContext = connect_to_relay(self._wd_path, self._server_address, self._user_credentials)
 
         proc: SDKProcessor = context.find_processor_by_name(self._proc.name)
         assert(proc is not None)
@@ -651,6 +649,8 @@ class RelayServerTestCase(unittest.TestCase):
                 c = read_json_from_file(download_path)
                 c = c['v']
                 print(f"{a} + {b} = {c}")
+
+        context.close()
 
 
 if __name__ == '__main__':
