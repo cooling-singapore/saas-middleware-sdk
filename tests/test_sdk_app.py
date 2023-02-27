@@ -6,11 +6,11 @@ from typing import List
 
 from fastapi import Depends
 from pydantic import BaseModel
+from saas.rest.proxy import EndpointProxy
 
 from saas.core.keystore import Keystore
 from saas.rest.schemas import EndpointDefinition
 from saas.sdk.app.base import Application, User, UserDB, UserAuth, get_current_active_user
-from saas.sdk.app.proxy import AppProxy
 from saas.sdk.helper import create_wd, create_rnd_hex_string
 
 
@@ -35,16 +35,16 @@ class TestApp(Application):
         return TestResponse(message='hello open world!!!')
 
 
-class TestAppProxy(AppProxy):
+class TestAppProxy(EndpointProxy):
     def __init__(self, remote_address: (str, int), endpoint_prefix: str, username: str, password: str):
-        super().__init__(remote_address, endpoint_prefix, username, password)
+        super().__init__(endpoint_prefix, remote_address, credentials=(username, password))
 
     def unprotected(self) -> TestResponse:
         result = self.get('/unprotected')
         return TestResponse.parse_obj(result)
 
     def protected(self) -> TestResponse:
-        result = self.get('/protected', token=self.token)
+        result = self.get('/protected')
         return TestResponse.parse_obj(result)
 
 
@@ -113,7 +113,7 @@ class SDKAppTestCase(unittest.TestCase):
         pass
 
     def test_get_token(self):
-        token = self._proxy.token
+        token = self._proxy.session.token
         assert(token is not None)
 
     def test_unprotected_endpoint(self):
