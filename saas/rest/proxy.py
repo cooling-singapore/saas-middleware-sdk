@@ -1,6 +1,6 @@
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Union, Optional, BinaryIO
 
 import requests
@@ -146,7 +146,7 @@ class Session:
 
     @property
     def token(self) -> Token:
-        now = int(datetime.utcnow().timestamp())
+        now = datetime.now(tz=timezone.utc).timestamp()
         if self._token is None or now > self._token.expiry - 60:
             self.refresh_token()
 

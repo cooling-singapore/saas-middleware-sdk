@@ -1,6 +1,6 @@
 import os.path
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -255,11 +255,13 @@ class UserAuth:
             )
 
         # create the token
-        expiry = datetime.utcnow() + timedelta(minutes=cls._access_token_expires_minutes)
+        now = datetime.now(tz=timezone.utc)
+        expiry = now + timedelta(minutes=cls._access_token_expires_minutes)
         content = {
             'sub': user.login,
             'exp': expiry
         }
         access_token = jwt.encode(content, cls.secret_key, algorithm=cls.algorithm)
 
-        return Token(access_token=access_token, token_type='bearer', expiry=expiry.timestamp())
+        token = Token(access_token=access_token, token_type='bearer', expiry=expiry.timestamp())
+        return token
