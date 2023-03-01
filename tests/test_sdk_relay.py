@@ -1,8 +1,11 @@
+import json
 import logging
 import os
 import shutil
 import time
 import unittest
+import shapely
+from shapely import Polygon
 
 from saas.core.exceptions import SaaSRuntimeException
 from saas.core.helpers import read_json_from_file
@@ -14,19 +17,19 @@ from saas.rest.exceptions import UnexpectedHTTPError
 from saas.rti.proxy import RTIProxy
 from saas.rti.schemas import Task, JobStatus
 from saas.sdk.app.auth import UserDB, UserAuth
-from saas.sdk.base import SDKProcessor, connect, connect_to_relay, SDKRelayContext
+from saas.sdk.base import SDKProcessor, connect, connect_to_relay, SDKRelayContext, SDKCDataObject
 from saas.sdk.helper import create_wd, create_rnd_hex_string, generate_random_file
 
-from relay.server import RelayServer
+from relay.server import RelayServer, RELAY_ENDPOINT_PREFIX_BASE
 
 Logging.initialise(logging.DEBUG)
 logger = Logging.get(__name__)
 
 nextcloud_path = os.path.join(os.environ['HOME'], 'Nextcloud', 'CS', 'CS2.0', 'Pillar DUCT R&D', 'Testing')
 
-db_endpoint_prefix = '/relay/v1/db'
-dor_endpoint_prefix = '/relay/v1/dor'
-rti_endpoint_prefix = '/relay/v1/rti'
+db_endpoint_prefix = (RELAY_ENDPOINT_PREFIX_BASE, 'db')
+dor_endpoint_prefix = (RELAY_ENDPOINT_PREFIX_BASE, 'dor')
+rti_endpoint_prefix = (RELAY_ENDPOINT_PREFIX_BASE, 'rti')
 
 
 class RelayServerTestCase(unittest.TestCase):
@@ -55,12 +58,12 @@ class RelayServerTestCase(unittest.TestCase):
             UserDB.initialise(self._wd_path)
 
             # create users: owner and user
-            password = 'password'
-            self._owner = UserDB.add_user('foo.bar@email.com', 'Foo Bar', password)
-            self._user = UserDB.add_user('john.doe@email.com', 'John Doe', password)
+            self._password = 'password'
+            self._owner = UserDB.add_user('foo.bar@email.com', 'Foo Bar', self._password)
+            self._user = UserDB.add_user('john.doe@email.com', 'John Doe', self._password)
 
-            self._owner_credentials = ('foo.bar@email.com', password)
-            self._user_credentials = ('john.doe@email.com', password)
+            self._owner_credentials = ('foo.bar@email.com', self._password)
+            self._user_credentials = ('john.doe@email.com', self._password)
 
             # create Dashboard server and proxy
             self._server = RelayServer(self._server_address, self._node_address, self._wd_path)
@@ -517,6 +520,9 @@ class RelayServerTestCase(unittest.TestCase):
             assert False
 
     def test_submit_status_logs_provenance(self) -> None:
+        # connect to Relay -> this publishes a 'proxy identity' for the user (i.e., _owner) which we are
+        # going to use in this test case
+        connect_to_relay(self._wd_path, self._server_address, (self._owner.login, self._password))
 
         task_input = [
             Task.InputValue.parse_obj({'name': 'a', 'type': 'value', 'value': {'v': 1}}),
@@ -691,7 +697,9 @@ class RelayServerTestCase(unittest.TestCase):
                                                     credentials=('foo.bar@somewhere.com', '105PFvIg'))
 
         result = context.find_processors()
-        print(result)
+        for proc in result:
+            print(proc.name)
+            print(proc.descriptor)
 
         context.close()
 

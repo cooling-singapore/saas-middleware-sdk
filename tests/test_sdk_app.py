@@ -19,8 +19,9 @@ class TestResponse(BaseModel):
 
 
 class TestApp(Application):
-    def __init__(self, address: (str, int), node_address: (str, int), wd_path: str, endpoint_prefix: str):
-        super().__init__(address, node_address, endpoint_prefix, wd_path, 'Test App', 'v0.0.1', 'This is a test app')
+    def __init__(self, address: (str, int), node_address: (str, int), wd_path: str, endpoint_prefix: (str, str)):
+        super().__init__(address, node_address, endpoint_prefix,
+                         wd_path, 'Test App', 'v0.0.1', 'This is a test app')
 
     def endpoints(self) -> List[EndpointDefinition]:
         return [
@@ -36,20 +37,21 @@ class TestApp(Application):
 
 
 class TestAppProxy(EndpointProxy):
-    def __init__(self, remote_address: (str, int), endpoint_prefix: str, username: str, password: str):
+    def __init__(self, remote_address: (str, int), endpoint_prefix: (str, str), username: str, password: str):
         super().__init__(endpoint_prefix, remote_address, credentials=(username, password))
 
     def unprotected(self) -> TestResponse:
-        result = self.get('/unprotected')
+        result = self.get('unprotected')
         return TestResponse.parse_obj(result)
 
     def protected(self) -> TestResponse:
-        result = self.get('/protected')
+        result = self.get('protected')
         return TestResponse.parse_obj(result)
 
 
 class Server(Thread):
-    def __init__(self, address: (str, int), node_address: (str, int), endpoint_prefix: str, wd_path: str) -> None:
+    def __init__(self, address: (str, int), node_address: (str, int), endpoint_prefix: (str, str),
+                 wd_path: str) -> None:
         super().__init__()
         self._address = address
         self._node_address = node_address
@@ -91,7 +93,7 @@ class SDKAppTestCase(unittest.TestCase):
         cls._known_user = Keystore.create(cls._wd_path, 'John Doe', 'john.doe@somewhere.com', 'password')
 
         # create and start server
-        endpoint_prefix = '/v1/test'
+        endpoint_prefix = ('/v1', 'test')
         cls._server = Server(cls._address, None, endpoint_prefix, cls._wd_path)
         cls._server.start()
         cls._proxy = TestAppProxy(cls._address, endpoint_prefix, 'foo.bar@somewhere.com', 'password')

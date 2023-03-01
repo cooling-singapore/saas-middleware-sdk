@@ -22,10 +22,13 @@ from saas.sdk.app.auth import User
 from saas.sdk.app.base import Application, get_current_active_user
 from starlette.responses import Response, StreamingResponse
 
-from relay.meta import __title__, __version__, __description__, __endpoint_prefix__
+from relay.meta import __title__, __version__, __description__
 from relay.checks import CheckIfUser
 
-logger = Logging.get('dashboard.server')
+logger = Logging.get('relay.server')
+
+
+RELAY_ENDPOINT_PREFIX_BASE = '/relay/v1'
 
 
 class RelayRuntimeError(Exception):
@@ -69,19 +72,18 @@ def _stream_contents(content_path: str, delete_content_file: bool = True) -> Res
 
 class RelayServer(Application):
     def __init__(self, server_address: (str, int), node_address: (str, int), wd_path: str) -> None:
-        super().__init__(server_address, node_address, __endpoint_prefix__, wd_path,
+        super().__init__(server_address, node_address, (RELAY_ENDPOINT_PREFIX_BASE, None), wd_path,
                          __title__, __version__, __description__)
 
         self._job_mapping: Dict[str, NodeInfo] = {}
-        self._proxy_identity: Optional[Identity] = None
-        self._user_identity: Optional[Identity] = None
+        self._user_to_proxy: Dict[str, Identity] = {}
 
     def endpoints(self) -> List[EndpointDefinition]:
         check_if_user = Depends(CheckIfUser(self))
 
-        db_endpoint_prefix = '/relay/v1/db'
-        dor_endpoint_prefix = '/relay/v1/dor'
-        rti_endpoint_prefix = '/relay/v1/rti'
+        db_endpoint_prefix = (RELAY_ENDPOINT_PREFIX_BASE, 'db')
+        dor_endpoint_prefix = (RELAY_ENDPOINT_PREFIX_BASE, 'dor')
+        rti_endpoint_prefix = (RELAY_ENDPOINT_PREFIX_BASE, 'rti')
 
         return [
             EndpointDefinition('GET', db_endpoint_prefix, 'node',
@@ -204,8 +206,8 @@ class RelayServer(Application):
         Retrieves the identity given its id (if the node db knows about it).
         """
         # if it's the iid of the Relay proxy identity, return the proxy
-        if self._proxy_identity and iid == self._proxy_identity.id:
-            return self._proxy_identity
+        if iid in self._user_to_proxy:
+            return self._user_to_proxy[iid]
         else:
             proxy = NodeDBProxy(self._node_address)
             result = proxy.get_identity(iid)
@@ -231,9 +233,8 @@ class RelayServer(Application):
             if name != user.login:
                 raise RelayRuntimeError(f"User login and relay proxy identity name don't match: {user.login} != {name}")
 
-            # keep both identities for later use
-            self._user_identity = user.identity
-            self._proxy_identity = identity
+            # map the proxy identity to the user
+            self._user_to_proxy[user.identity.id] = identity
 
             # we publish and return the actual identity of the user so the SDK may use it if/when needed.
             proxy = NodeDBProxy(self._node_address)
@@ -645,6 +646,11 @@ class RelayServer(Application):
         Submits a task to a deployed processor, thereby creating a new job. The job is queued and executed once the
         processor has the capacity to do so. Authorisation is required by the owner of the task/job.
         """
+        # get the proxy identity for this user
+        proxy_identity = self._user_to_proxy.get(user.identity.id)
+        if not proxy_identity:
+            raise RelayRuntimeError(f"No proxy identity found for user {user.login}")
+
         for node in self._find_all_rtis():
             rti = RTIProxy(node.rest_address)
             for proc in rti.get_deployed():
@@ -656,16 +662,16 @@ class RelayServer(Application):
                             # users' actual identity
                             if i.user_signature:
                                 message = f"{node.identity.id}:{i.obj_id}".encode('utf-8')
-                                if not self._proxy_identity.verify(message, i.user_signature):
-                                    raise  RelayRuntimeError(f"Signature verification failed for task input reference: "
-                                                             f"{i.name}")
+                                if not proxy_identity.verify(message, i.user_signature):
+                                    raise RelayRuntimeError(f"Signature verification failed for task input reference: "
+                                                            f"{i.name}")
 
                                 # update with new signature
                                 i.user_signature = user.keystore.sign(f"{node.identity.id}:{i.obj_id}".encode('utf-8'))
 
                     # update output owners
                     for o in task.output:
-                        if o.owner_iid == self._proxy_identity.id:
+                        if o.owner_iid == proxy_identity.id:
                             o.owner_iid = user.identity.id
 
                     job = rti.submit_job(proc_id, job_input=task.input, job_output=task.output,
