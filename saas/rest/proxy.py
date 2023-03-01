@@ -267,8 +267,11 @@ class EndpointProxy:
             raise UnsuccessfulConnectionError(url)
 
     def _make_url(self, endpoint: str, parameters: dict = None) -> str:
-        url = f"{self._remote_address[0]}://{self._remote_address[1]}:{self._remote_address[2]}" \
-              f"{self._endpoint_prefix[0]}/{self._endpoint_prefix[1]}/{endpoint}"
+        url = f"{self._remote_address[0]}://{self._remote_address[1]}:{self._remote_address[2]}"
+        url += f"{self._endpoint_prefix[0]}/{self._endpoint_prefix[1]}" if self._endpoint_prefix[1] \
+            else self._endpoint_prefix[0]
+
+        url += f"/{endpoint}"
 
         if parameters:
             eligible = {}
