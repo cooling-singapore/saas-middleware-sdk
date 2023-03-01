@@ -3,6 +3,8 @@ import os
 from typing import List, Union, Optional, Dict
 
 from fastapi import Depends, Form, UploadFile, File
+from snappy import snappy
+
 from saas.core.exceptions import ExceptionContent
 from saas.core.helpers import generate_random_string, get_timestamp_now
 from saas.core.identity import Identity
@@ -322,7 +324,6 @@ class RelayServer(Application):
         attachment_path = os.path.join(self._wd_path, f"{get_timestamp_now()}_{generate_random_string(4)}")
         try:
             with open(attachment_path, 'wb') as f:
-                buffer = bytearray()
                 while True:
                     chunk = attachment.file.read(4)
                     if not chunk:
@@ -330,7 +331,7 @@ class RelayServer(Application):
 
                     chunk_length = int.from_bytes(chunk, 'big')
                     chunk = attachment.file.read(chunk_length)
-                    buffer.extend(chunk)
+                    chunk = snappy.decompress(chunk)
                     f.write(chunk)
 
         except Exception as e:
