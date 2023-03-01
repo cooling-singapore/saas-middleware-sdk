@@ -100,7 +100,9 @@ class Snapper:
 
 
 class Session:
-    def __init__(self, remote_address: Union[tuple[str, str, int], tuple[str, int]], credentials: (str, str)) -> None:
+    def __init__(self, endpoint_prefix_base: str, remote_address: Union[tuple[str, str, int], tuple[str, int]],
+                 credentials: (str, str)) -> None:
+        self._endpoint_prefix_base = endpoint_prefix_base
         self._remote_address = remote_address
         self._remote_address = \
             remote_address if len(remote_address) == 3 else ('http', remote_address[0], remote_address[1])
@@ -111,6 +113,10 @@ class Session:
         self._expiry = None
 
     @property
+    def endpoint_prefix_base(self) -> str:
+        return self._endpoint_prefix_base
+
+    @property
     def address(self) -> (str, str, int):
         return self._remote_address
 
@@ -118,7 +124,8 @@ class Session:
     def credentials(self) -> (str, str):
         return self._credentials
 
-    def refresh_token(self) -> None:
+    def refresh_token(self) -> Token:
+        print(f"refresh token")
         data = {
             'grant_type': 'password',
             'username': self._credentials[0],
@@ -126,34 +133,33 @@ class Session:
         }
 
         # get the token
-        result = self._auth_post('/token', data=data)
-        self._token = Token.parse_obj(result)
+        url = f"{self._remote_address[0]}://{self._remote_address[1]}:{self._remote_address[2]}" \
+              f"{self._endpoint_prefix_base}/token"
+        try:
+            response = requests.post(url, data=data)
+            result = extract_response(response)
+            self._token = Token.parse_obj(result)
+            return self._token
+
+        except requests.exceptions.ConnectionError:
+            raise UnsuccessfulConnectionError(url)
 
     @property
     def token(self) -> Token:
         now = int(datetime.utcnow().timestamp())
         if self._token is None or now > self._token.expiry - 60:
             self.refresh_token()
+
         return self._token
-
-    def _auth_post(self, endpoint: str, data=None) -> dict:
-        url = f"{self._remote_address[0]}://{self._remote_address[1]}:{self._remote_address[2]}{endpoint}"
-
-        try:
-            response = requests.post(url, data=data)
-            return extract_response(response)
-
-        except requests.exceptions.ConnectionError:
-            raise UnsuccessfulConnectionError(url)
 
 
 class EndpointProxy:
-    def __init__(self, endpoint_prefix: str, remote_address: Union[tuple[str, str, int], tuple[str, int]],
+    def __init__(self, endpoint_prefix: (str, str), remote_address: Union[tuple[str, str, int], tuple[str, int]],
                  credentials: (str, str) = None) -> None:
         self._endpoint_prefix = endpoint_prefix
         self._remote_address = \
             remote_address if len(remote_address) == 3 else ('http', remote_address[0], remote_address[1])
-        self._session = Session(remote_address, credentials) if credentials else None
+        self._session = Session(endpoint_prefix[0], remote_address, credentials) if credentials else None
 
     @property
     def remote_address(self) -> (str, str, int):
@@ -262,10 +268,9 @@ class EndpointProxy:
             raise UnsuccessfulConnectionError(url)
 
     def _make_url(self, endpoint: str, parameters: dict = None) -> str:
-        endpoint = '/' if endpoint == '' else endpoint
-
         url = f"{self._remote_address[0]}://{self._remote_address[1]}:{self._remote_address[2]}" \
-              f"{self._endpoint_prefix}{endpoint}"
+              f"{self._endpoint_prefix[0]}/{self._endpoint_prefix[1]}/{endpoint}"
+
         if parameters:
             eligible = {}
             for k, v in parameters.items():
