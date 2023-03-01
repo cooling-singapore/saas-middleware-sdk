@@ -125,7 +125,6 @@ class Session:
         return self._credentials
 
     def refresh_token(self) -> Token:
-        print(f"refresh token")
         data = {
             'grant_type': 'password',
             'username': self._credentials[0],
