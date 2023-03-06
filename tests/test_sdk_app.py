@@ -6,11 +6,11 @@ from typing import List
 
 from fastapi import Depends
 from pydantic import BaseModel
+from saas.rest.proxy import EndpointProxy
 
 from saas.core.keystore import Keystore
 from saas.rest.schemas import EndpointDefinition
 from saas.sdk.app.base import Application, User, UserDB, UserAuth, get_current_active_user
-from saas.sdk.app.proxy import AppProxy
 from saas.sdk.helper import create_wd, create_rnd_hex_string
 
 
@@ -19,8 +19,9 @@ class TestResponse(BaseModel):
 
 
 class TestApp(Application):
-    def __init__(self, address: (str, int), node_address: (str, int), wd_path: str, endpoint_prefix: str):
-        super().__init__(address, node_address, endpoint_prefix, wd_path, 'Test App', 'v0.0.1', 'This is a test app')
+    def __init__(self, address: (str, int), node_address: (str, int), wd_path: str, endpoint_prefix: (str, str)):
+        super().__init__(address, node_address, endpoint_prefix,
+                         wd_path, 'Test App', 'v0.0.1', 'This is a test app')
 
     def endpoints(self) -> List[EndpointDefinition]:
         return [
@@ -35,21 +36,22 @@ class TestApp(Application):
         return TestResponse(message='hello open world!!!')
 
 
-class TestAppProxy(AppProxy):
-    def __init__(self, remote_address: (str, int), endpoint_prefix: str, username: str, password: str):
-        super().__init__(remote_address, endpoint_prefix, username, password)
+class TestAppProxy(EndpointProxy):
+    def __init__(self, remote_address: (str, int), endpoint_prefix: (str, str), username: str, password: str):
+        super().__init__(endpoint_prefix, remote_address, credentials=(username, password))
 
     def unprotected(self) -> TestResponse:
-        result = self.get('/unprotected')
+        result = self.get('unprotected')
         return TestResponse.parse_obj(result)
 
     def protected(self) -> TestResponse:
-        result = self.get('/protected', token=self.token)
+        result = self.get('protected')
         return TestResponse.parse_obj(result)
 
 
 class Server(Thread):
-    def __init__(self, address: (str, int), node_address: (str, int), endpoint_prefix: str, wd_path: str) -> None:
+    def __init__(self, address: (str, int), node_address: (str, int), endpoint_prefix: (str, str),
+                 wd_path: str) -> None:
         super().__init__()
         self._address = address
         self._node_address = node_address
@@ -91,7 +93,7 @@ class SDKAppTestCase(unittest.TestCase):
         cls._known_user = Keystore.create(cls._wd_path, 'John Doe', 'john.doe@somewhere.com', 'password')
 
         # create and start server
-        endpoint_prefix = '/v1/test'
+        endpoint_prefix = ('/v1', 'test')
         cls._server = Server(cls._address, None, endpoint_prefix, cls._wd_path)
         cls._server.start()
         cls._proxy = TestAppProxy(cls._address, endpoint_prefix, 'foo.bar@somewhere.com', 'password')
@@ -113,7 +115,7 @@ class SDKAppTestCase(unittest.TestCase):
         pass
 
     def test_get_token(self):
-        token = self._proxy.token
+        token = self._proxy.session.token
         assert(token is not None)
 
     def test_unprotected_endpoint(self):

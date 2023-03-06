@@ -35,7 +35,7 @@ setup(
     long_description_content_type='text/markdown',
     entry_points={
         'console_scripts': [
-            'saas-cli = saas.cli.saas_cli:main',
+            'saas-relay = relay.cli:main'
         ]
     },
     classifiers=[

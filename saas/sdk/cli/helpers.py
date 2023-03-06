@@ -13,6 +13,8 @@ from typing import Optional, Union, List, Any
 from InquirerPy import inquirer
 from InquirerPy.base import Choice
 from pydantic import ValidationError
+from saas.sdk.cli.exceptions import CLIRuntimeError
+
 from saas.core.exceptions import SaaSRuntimeException
 from saas.core.identity import Identity
 from saas.core.keystore import Keystore
@@ -23,8 +25,6 @@ from saas.dor.schemas import DataObject, GPPDataObject, GPP_DATA_TYPE
 from saas.nodedb.proxy import NodeDBProxy
 from saas.nodedb.schemas import NodeInfo
 from saas.rest.exceptions import UnsuccessfulRequestError
-
-from cli.exceptions import CLIRuntimeError
 
 logger = Logging.get('cli.helpers')
 
