@@ -30,6 +30,7 @@ from saas.sdk.dot import DataObjectType
 logger = Logging.get('saas.sdk.app')
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+default_userstore = os.path.join(os.environ['HOME'], '.userstore')
 
 
 class TokenData(BaseModel):
@@ -181,6 +182,9 @@ class Application(abc.ABC):
             endpoints.append(EndpointDefinition('POST', (self._endpoint_prefix[0], ''), 'token',
                                                 UserAuth.login_for_access_token, Token, None))
 
+            endpoints.append(EndpointDefinition('POST', (self._endpoint_prefix[0], ''), 'user/update',
+                                                self.update_user, User, None))
+
             # add endpoints
             for endpoint in endpoints:
                 self._register(endpoint)
@@ -232,3 +236,9 @@ class Application(abc.ABC):
             logger.info(f"REST service shutting down...")
             # there is no way to terminate a thread...
             # self._thread.terminate()
+
+    def update_user(self, login: str, previous_password: str, new_password: str, new_user_display_name: str) -> User:
+        if not os.path.isdir(default_userstore):
+            raise RuntimeError(f"Directory does not exist for the userstore: " + default_userstore)
+        UserDB.initialise(default_userstore)
+        return UserDB.update_user(login, previous_password, new_password, new_user_display_name, False)
