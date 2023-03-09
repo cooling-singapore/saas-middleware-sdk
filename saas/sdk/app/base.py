@@ -192,6 +192,9 @@ class Application(abc.ABC):
             endpoints.append(EndpointDefinition('POST', (self._endpoint_prefix[0], ''), 'token',
                                                 UserAuth.login_for_access_token, Token, None))
 
+            endpoints.append(EndpointDefinition('GET', (self._endpoint_prefix[0], ''), 'user/profile',
+                                                self.get_user, UserProfile, None))
+
             endpoints.append(EndpointDefinition('PUT', (self._endpoint_prefix[0], ''), 'user/profile',
                                                 self.update_user, UserProfile, None))
 
@@ -246,6 +249,12 @@ class Application(abc.ABC):
             logger.info(f"REST service shutting down...")
             # there is no way to terminate a thread...
             # self._thread.terminate()
+
+    def get_user(self, user: User = Depends(get_current_active_user)) -> UserProfile:
+        """
+        Returns the user profile.
+        """
+        return UserProfile(login=user.login, name=user.name, disabled=user.disabled)
 
     def update_user(self, p: UpdateUserParameters, user: User = Depends(get_current_active_user)) -> UserProfile:
         """
