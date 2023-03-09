@@ -92,7 +92,7 @@ class SDKAuthTestCase(unittest.TestCase):
         assert (user is not None)
         assert (os.path.isfile(user.keystore.path))
 
-        user = UserDB.update_user(user.login, '', '', 'New Username', False)
+        user = UserDB.update_user(user.login, False, user_display_name='New Username')
         assert (user.name == 'New Username')
         print(user)
 
@@ -104,7 +104,7 @@ class SDKAuthTestCase(unittest.TestCase):
         print(user)
         assert (user is not None)
         assert (os.path.isfile(user.keystore.path))
-        user = UserDB.update_user(user.login, 'password', 'newpassword', '', False)
+        user = UserDB.update_user(user.login, False, password=('password', 'newpassword'))
         print(user)
 
 
