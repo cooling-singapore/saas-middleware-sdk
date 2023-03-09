@@ -1,5 +1,5 @@
 import os.path
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, status
@@ -214,22 +214,22 @@ class UserDB:
                 })
 
     @classmethod
-    def update_user(cls, login: str, previous_password: str, new_password: str, user_display_name: str,
-                    is_admin: bool) -> User:
+    def update_user(cls, login: str, is_admin: bool, password: Tuple[str, str] = None,
+                    user_display_name: str = None) -> User:
         with cls._Session() as session:
             # check if this username exists
             record = session.query(UserRecord).get(login)
             if record:
                 if user_display_name:
                     record.name = user_display_name
-                if new_password:
+                if password:
                     # admin has access to change other users password
                     if is_admin:
-                        record.hashed_password = UserAuth.get_password_hash(new_password)
+                        record.hashed_password = UserAuth.get_password_hash(password[1])
                     # check previous password when user changing their password
-                    elif previous_password:
-                        if UserAuth.verify_password(previous_password, record.hashed_password):
-                            record.hashed_password = UserAuth.get_password_hash(new_password)
+                    elif password[0]:
+                        if UserAuth.verify_password(password[0], record.hashed_password):
+                            record.hashed_password = UserAuth.get_password_hash(password[1])
                         else:
                             raise AppRuntimeError("Password does not match", details={
                                 'login': login

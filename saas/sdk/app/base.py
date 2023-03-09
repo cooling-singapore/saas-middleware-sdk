@@ -5,7 +5,7 @@ import os
 import threading
 import time
 from threading import Lock
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Optional, Tuple
 
 import uvicorn
 from fastapi import FastAPI, Request, Depends, HTTPException, status
@@ -30,11 +30,21 @@ from saas.sdk.dot import DataObjectType
 logger = Logging.get('saas.sdk.app')
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-default_userstore = os.path.join(os.environ['HOME'], '.userstore')
 
 
 class TokenData(BaseModel):
     username: Union[str, None] = None
+
+
+class UpdateUserParameters(BaseModel):
+    password: Optional[Tuple[str, str]]
+    name: Optional[str]
+
+
+class UserProfile(BaseModel):
+    login: str
+    name: str
+    disabled: bool
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
@@ -182,8 +192,8 @@ class Application(abc.ABC):
             endpoints.append(EndpointDefinition('POST', (self._endpoint_prefix[0], ''), 'token',
                                                 UserAuth.login_for_access_token, Token, None))
 
-            endpoints.append(EndpointDefinition('POST', (self._endpoint_prefix[0], ''), 'user/update',
-                                                self.update_user, User, None))
+            endpoints.append(EndpointDefinition('PUT', (self._endpoint_prefix[0], ''), 'user/profile',
+                                                self.update_user, UserProfile, None))
 
             # add endpoints
             for endpoint in endpoints:
@@ -237,8 +247,9 @@ class Application(abc.ABC):
             # there is no way to terminate a thread...
             # self._thread.terminate()
 
-    def update_user(self, login: str, previous_password: str, new_password: str, new_user_display_name: str) -> User:
-        if not os.path.isdir(default_userstore):
-            raise RuntimeError(f"Directory does not exist for the userstore: " + default_userstore)
-        UserDB.initialise(default_userstore)
-        return UserDB.update_user(login, previous_password, new_password, new_user_display_name, False)
+    def update_user(self, p: UpdateUserParameters, user: User = Depends(get_current_active_user)) -> UserProfile:
+        """
+        Updates a user information (name and/or password) and returns the user profile.
+        """
+        user = UserDB.update_user(user.login, False, password=p.password, user_display_name=p.name)
+        return UserProfile(login=user.login, name=user.name, disabled=user.disabled)
