@@ -5,7 +5,7 @@ import os
 import threading
 import time
 from threading import Lock
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Optional, Tuple
 
 import uvicorn
 from fastapi import FastAPI, Request, Depends, HTTPException, status
@@ -34,6 +34,17 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 class TokenData(BaseModel):
     username: Union[str, None] = None
+
+
+class UpdateUserParameters(BaseModel):
+    password: Optional[Tuple[str, str]]
+    name: Optional[str]
+
+
+class UserProfile(BaseModel):
+    login: str
+    name: str
+    disabled: bool
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
@@ -181,6 +192,12 @@ class Application(abc.ABC):
             endpoints.append(EndpointDefinition('POST', (self._endpoint_prefix[0], ''), 'token',
                                                 UserAuth.login_for_access_token, Token, None))
 
+            endpoints.append(EndpointDefinition('GET', (self._endpoint_prefix[0], ''), 'user/profile',
+                                                self.get_user, UserProfile, None))
+
+            endpoints.append(EndpointDefinition('PUT', (self._endpoint_prefix[0], ''), 'user/profile',
+                                                self.update_user, UserProfile, None))
+
             # add endpoints
             for endpoint in endpoints:
                 self._register(endpoint)
@@ -232,3 +249,16 @@ class Application(abc.ABC):
             logger.info(f"REST service shutting down...")
             # there is no way to terminate a thread...
             # self._thread.terminate()
+
+    def get_user(self, user: User = Depends(get_current_active_user)) -> UserProfile:
+        """
+        Returns the user profile.
+        """
+        return UserProfile(login=user.login, name=user.name, disabled=user.disabled)
+
+    def update_user(self, p: UpdateUserParameters, user: User = Depends(get_current_active_user)) -> UserProfile:
+        """
+        Updates a user information (name and/or password) and returns the user profile.
+        """
+        user = UserDB.update_user(user.login, False, password=p.password, user_display_name=p.name)
+        return UserProfile(login=user.login, name=user.name, disabled=user.disabled)

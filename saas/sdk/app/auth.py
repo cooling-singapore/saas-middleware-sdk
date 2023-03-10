@@ -1,5 +1,5 @@
 import os.path
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, status
@@ -213,6 +213,46 @@ class UserDB:
                     'login': login
                 })
 
+    @classmethod
+    def update_user(cls, login: str, is_admin: bool, password: Tuple[str, str] = None,
+                    user_display_name: str = None) -> User:
+        with cls._Session() as session:
+            # check if this username exists
+            record = session.query(UserRecord).get(login)
+            if record:
+                if user_display_name:
+                    record.name = user_display_name
+                if password:
+                    # admin has access to change other users password
+                    if is_admin:
+                        record.hashed_password = UserAuth.get_password_hash(password[1])
+                    # check previous password when user changing their password
+                    elif password[0]:
+                        if UserAuth.verify_password(password[0], record.hashed_password):
+                            record.hashed_password = UserAuth.get_password_hash(password[1])
+                        else:
+                            raise AppRuntimeError("Password does not match", details={
+                                'login': login
+                            })
+                    else:
+                        raise AppRuntimeError("Please provide the previous password", details={
+                            'login': login
+                        })
+
+                session.commit()
+                return User(
+                    login=record.login,
+                    name=record.name,
+                    disabled=record.disabled,
+                    hashed_password=record.hashed_password,
+                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
+                )
+
+            else:
+                raise AppRuntimeError("Username does not exist", details={
+                    'login': login
+                })
+
 
 class UserAuth:
     secret_key = None
@@ -225,7 +265,7 @@ class UserAuth:
         cls.secret_key = secret_key
 
     @classmethod
-    def _verify_password(cls, plain_password: str, hashed_password: str) -> bool:
+    def verify_password(cls, plain_password: str, hashed_password: str) -> bool:
         return cls._pwd_context.verify(plain_password, hashed_password)
 
     @classmethod
@@ -234,7 +274,7 @@ class UserAuth:
         if not user:
             return None
 
-        if not cls._verify_password(password, user.hashed_password):
+        if not cls.verify_password(password, user.hashed_password):
             return None
 
         return user
