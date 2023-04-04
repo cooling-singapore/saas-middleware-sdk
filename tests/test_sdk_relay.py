@@ -703,6 +703,147 @@ class RelayServerTestCase(unittest.TestCase):
 
         context.close()
 
+    def test_sdk_remote_iemsim(self) -> None:
+        # path to the building footprints file with ALL the building footprints
+        bf_path = os.path.join(nextcloud_path, 'bdpimport_geo', 'output', 'building-footprints')
+
+        # bounding box of the area of interest
+        area = {
+            "west": 103.9058553468161392,
+            "south": 1.3270255520350709,
+            "east": 103.9090271198505349,
+            "north": 1.3290574984153798
+        }
+
+        # path to the building footprints file with only those buildings that are inside the area of interest
+        extracted_bf_path = os.path.join(self._wd_path, 'bf_extracted.geojson')
+
+        # extract the buildings in the area of interest
+        extract_buildings(bf_path, area, extracted_bf_path)
+
+        # connect to the Relay
+        context: SDKRelayContext = connect_to_relay(self._wd_path,
+                                                    relay_address=('https', 'api-dev.duct.sg', 443),
+                                                    credentials=('foo.bar@somewhere.com', '105PFvIg'))
+
+        # upload the extracted buildings so the processors can use it
+        bf_obj = context.upload_content(extracted_bf_path, 'DUCT.GeoVectorData', 'geojson', access_restricted=False)
+        print(bf_obj.meta)
+
+        # find the two processors that we need: ucm-iem-prep and ucm-iem-sim
+        proc_prep = context.find_processor_by_name('ucm-iem-prep')
+        proc_sim = context.find_processor_by_name('ucm-iem-sim')
+        if proc_prep is None or proc_sim is None:
+            raise RuntimeError("Processors not found.")
+
+        # define the output path, i.e., the folder where to store all the simulation output
+        # output_path = self._wd_path
+        output_path = os.path.join(os.environ['HOME'], 'Desktop')
+
+        # running an IEM simulation requires two steps: (1) pre-processing (using ucm-iem-prep) and
+        # (2) solving (using ucm-iem-sim).
+        # for ws in range(1, 5, 1):
+        #     for wd in range(0, 360, 45):
+        #         print(f"ws={ws} wd={wd}")
+        #         run_iem(proc_prep, proc_sim, bf_obj, wd, wd, area, output_path)
+
+        run_iem(proc_prep, proc_sim, bf_obj, 45, 2.5, area, output_path)
+
+        # close the Relay session
+        context.close()
+
+
+def run_iem(proc_prep: SDKProcessor, proc_sim: SDKProcessor, bf_obj: SDKCDataObject,
+            wd: float, ws: float, area: dict, output_path: str) -> None:
+
+    # submit the job for pre-processing -> creates everything that's needed to run IEM sim,
+    # most importantly it meshes the geometries.
+    job0 = proc_prep.submit({
+        'building-footprints': bf_obj,
+        'parameters': {
+            'settings': {
+                'wind_direction': wd,
+                'wind_speed': ws
+            },
+            # don't change the scaling parameters
+            'scaling': {
+                'lon': 111000,
+                'lat': 111000,
+                'height': 1
+            },
+            'area': area
+        }
+    })
+
+    # wait for the job to be done
+    output = job0.wait()
+
+    # obtain the run package handle
+    run_package = output['iem-run-package']
+    print(run_package.meta)
+    print(f"run package object id: {run_package.meta.obj_id}")
+
+    # submit the job for the IEMSim run.
+    job1 = proc_sim.submit({
+        'iem-run-package': run_package,
+        # don't change the following parameters. they are needed for the Aspire1 environment.
+        'parameters': {
+            'pbs_project_id': '21120261',
+            'pbs_queue': 'normal',
+            'pbs_nnodes': '1',
+            'pbs_ncpus': '24',
+            'pbs_mem': '96GB',
+            'pbs_mpiprocs': '24',
+            'walltime': '06:00:00',
+        }
+    })
+    print(f"job id: {job1.content.id}")
+
+    # wait for the job to be done
+    output = job1.wait()
+
+    at_map = output['air-temperature']
+    ws_map = output['wind-speed']
+    wd_map = output['wind-direction']
+
+    at_map.download(os.path.join(output_path, f'at_{ws}_{wd}.tiff'))
+    ws_map.download(os.path.join(output_path, f'ws_{ws}_{wd}.tiff'))
+    wd_map.download(os.path.join(output_path, f'wd_{ws}_{wd}.tiff'))
+
+    # clean up
+    run_package.delete()
+
+
+def extract_buildings(bf_input_path: str, bbox: dict,
+                      bf_output_path: str) -> None:
+    # create shape of bbox
+    west = bbox['west']
+    north = bbox['north']
+    east = bbox['east']
+    south = bbox['south']
+    area = Polygon([[west, north], [east, north], [east, south], [west, south]])
+
+    with open(bf_input_path, 'r') as f_in:
+        content = f_in.read()
+        content = json.loads(content)
+
+        # check all features, if the feature overlaps with the area of interest
+        result = []
+        for feature in content['features']:
+            geometry = feature['geometry']
+            shape = shapely.geometry.shape(geometry)
+
+            if area.intersection(shape).area > 0:
+                result.append(feature)
+
+    with open(bf_output_path, 'w') as f_out:
+        content = json.dumps({
+            'type': 'FeatureCollection',
+            # 'crs': {'type': 'name', 'properties': {'name': 'urn:ogc:def:crs:OGC:1.3:CRS84'}},
+            'features': result
+        })
+        f_out.write(content)
+
 
 if __name__ == '__main__':
     unittest.main()
