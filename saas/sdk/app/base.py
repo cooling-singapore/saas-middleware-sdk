@@ -5,7 +5,7 @@ import os
 import threading
 import time
 from threading import Lock
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Optional, Tuple
 
 import uvicorn
 from fastapi import FastAPI, Request, Depends, HTTPException, status
@@ -34,6 +34,17 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 class TokenData(BaseModel):
     username: Union[str, None] = None
+
+
+class UpdateUserParameters(BaseModel):
+    password: Optional[Tuple[str, str]]
+    name: Optional[str]
+
+
+class UserProfile(BaseModel):
+    login: str
+    name: str
+    disabled: bool
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
@@ -74,8 +85,8 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
 
 
 class Application(abc.ABC):
-    def __init__(self, address: (str, int), node_address: (str, int), endpoint_prefix: str, wd_path: str,
-                 title: str, version: str, description: str, context_expiry: int = 30) -> None:
+    def __init__(self, address: (str, int), node_address: (str, int), endpoint_prefix: (str, str),
+                 wd_path: str, title: str, version: str, description: str, context_expiry: int = 30) -> None:
 
         self._mutex = Lock()
         self._address = address
@@ -90,8 +101,8 @@ class Application(abc.ABC):
 
         self._mutex = Lock()
         self._api = FastAPI(
-            openapi_url=f"{self._endpoint_prefix}/openapi.json",
-            docs_url=f"{self._endpoint_prefix}/docs"
+            openapi_url=f"{self._endpoint_prefix[0]}/openapi.json",
+            docs_url=f"{self._endpoint_prefix[0]}/docs"
         )
         self._thread = None
 
@@ -104,7 +115,9 @@ class Application(abc.ABC):
         self._invalidate_thread.start()
 
     def _register(self, endpoint: EndpointDefinition) -> None:
-        route = f"{endpoint.prefix}/{endpoint.rule}"
+        route = f"{endpoint.prefix[0]}/{endpoint.prefix[1]}/{endpoint.rule}" \
+            if endpoint.prefix[1] else f"{endpoint.prefix[0]}/{endpoint.rule}"
+
         logger.info(f"REST app is mapping {endpoint.method}:{route} to {endpoint.function}")
         if endpoint.method == 'POST':
             self._api.post(route,
@@ -137,7 +150,7 @@ class Application(abc.ABC):
                 for key in list(self._context.keys()):
                     context = self._context[key]
                     if context.age > expiry:
-                        logger.debug(f"[context_invalidator] context expired: {context.user}")
+                        logger.debug(f"[context_invalidator] context expired: {context.authority}")
                         self._context.pop(key)
 
     def _get_context(self, user: User) -> SDKContext:
@@ -163,7 +176,7 @@ class Application(abc.ABC):
         return self._address
 
     @property
-    def endpoint_prefix(self) -> str:
+    def endpoint_prefix(self) -> (str, str):
         return self._endpoint_prefix
 
     @abc.abstractmethod
@@ -176,7 +189,14 @@ class Application(abc.ABC):
 
             # collect endpoints
             endpoints = self.endpoints()
-            endpoints.append(EndpointDefinition('POST', '', 'token', UserAuth.login_for_access_token, Token, None))
+            endpoints.append(EndpointDefinition('POST', (self._endpoint_prefix[0], ''), 'token',
+                                                UserAuth.login_for_access_token, Token, None))
+
+            endpoints.append(EndpointDefinition('GET', (self._endpoint_prefix[0], ''), 'user/profile',
+                                                self.get_user, UserProfile, None))
+
+            endpoints.append(EndpointDefinition('PUT', (self._endpoint_prefix[0], ''), 'user/profile',
+                                                self.update_user, UserProfile, None))
 
             # add endpoints
             for endpoint in endpoints:
@@ -229,3 +249,16 @@ class Application(abc.ABC):
             logger.info(f"REST service shutting down...")
             # there is no way to terminate a thread...
             # self._thread.terminate()
+
+    def get_user(self, user: User = Depends(get_current_active_user)) -> UserProfile:
+        """
+        Returns the user profile.
+        """
+        return UserProfile(login=user.login, name=user.name, disabled=user.disabled)
+
+    def update_user(self, p: UpdateUserParameters, user: User = Depends(get_current_active_user)) -> UserProfile:
+        """
+        Updates a user information (name and/or password) and returns the user profile.
+        """
+        user = UserDB.update_user(user.login, False, password=p.password, user_display_name=p.name)
+        return UserProfile(login=user.login, name=user.name, disabled=user.disabled)

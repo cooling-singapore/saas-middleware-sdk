@@ -84,5 +84,29 @@ class SDKAuthTestCase(unittest.TestCase):
         assert(user.disabled is False)
 
 
+    def test_update_user(self):
+        UserDB.initialise(self.wd_path)
+
+        user = UserDB.add_user('update', 'Update User', 'password')
+        print(user)
+        assert (user is not None)
+        assert (os.path.isfile(user.keystore.path))
+
+        user = UserDB.update_user(user.login, False, user_display_name='New Username')
+        assert (user.name == 'New Username')
+        print(user)
+
+
+    def test_update_user_password(self):
+        UserDB.initialise(self.wd_path)
+
+        user = UserDB.add_user('update', 'Update User', 'password')
+        print(user)
+        assert (user is not None)
+        assert (os.path.isfile(user.keystore.path))
+        user = UserDB.update_user(user.login, False, password=('password', 'newpassword'))
+        print(user)
+
+
 if __name__ == '__main__':
     unittest.main()

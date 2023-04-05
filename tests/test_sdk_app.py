@@ -6,11 +6,11 @@ from typing import List
 
 from fastapi import Depends
 from pydantic import BaseModel
+from saas.rest.proxy import EndpointProxy
 
 from saas.core.keystore import Keystore
 from saas.rest.schemas import EndpointDefinition
-from saas.sdk.app.base import Application, User, UserDB, UserAuth, get_current_active_user
-from saas.sdk.app.proxy import AppProxy
+from saas.sdk.app.base import Application, User, UserDB, UserAuth, get_current_active_user, UserProfile
 from saas.sdk.helper import create_wd, create_rnd_hex_string
 
 
@@ -19,8 +19,9 @@ class TestResponse(BaseModel):
 
 
 class TestApp(Application):
-    def __init__(self, address: (str, int), node_address: (str, int), wd_path: str, endpoint_prefix: str):
-        super().__init__(address, node_address, endpoint_prefix, wd_path, 'Test App', 'v0.0.1', 'This is a test app')
+    def __init__(self, address: (str, int), node_address: (str, int), wd_path: str, endpoint_prefix: (str, str)):
+        super().__init__(address, node_address, endpoint_prefix,
+                         wd_path, 'Test App', 'v0.0.1', 'This is a test app')
 
     def endpoints(self) -> List[EndpointDefinition]:
         return [
@@ -35,21 +36,43 @@ class TestApp(Application):
         return TestResponse(message='hello open world!!!')
 
 
-class TestAppProxy(AppProxy):
-    def __init__(self, remote_address: (str, int), endpoint_prefix: str, username: str, password: str):
-        super().__init__(remote_address, endpoint_prefix, username, password)
+class TestAppBaseProxy(EndpointProxy):
+    def __init__(self, remote_address: (str, int), endpoint_prefix: (str, str), username: str, password: str):
+        super().__init__(endpoint_prefix, remote_address, credentials=(username, password))
+
+    def profile(self) -> UserProfile:
+        result = self.get('user/profile')
+        return UserProfile.parse_obj(result)
+
+    def update_name(self, name: str) -> UserProfile:
+        result = self.put('user/profile', body={
+            'name': name
+        })
+        return UserProfile.parse_obj(result)
+
+    def update_password(self, password: (str, str)) -> UserProfile:
+        result = self.put('user/profile', body={
+            'password': password
+        })
+        return UserProfile.parse_obj(result)
+
+
+class TestAppProxy(EndpointProxy):
+    def __init__(self, remote_address: (str, int), endpoint_prefix: (str, str), username: str, password: str):
+        super().__init__(endpoint_prefix, remote_address, credentials=(username, password))
 
     def unprotected(self) -> TestResponse:
-        result = self.get('/unprotected')
+        result = self.get('unprotected')
         return TestResponse.parse_obj(result)
 
     def protected(self) -> TestResponse:
-        result = self.get('/protected', token=self.token)
+        result = self.get('protected')
         return TestResponse.parse_obj(result)
 
 
 class Server(Thread):
-    def __init__(self, address: (str, int), node_address: (str, int), endpoint_prefix: str, wd_path: str) -> None:
+    def __init__(self, address: (str, int), node_address: (str, int), endpoint_prefix: (str, str),
+                 wd_path: str) -> None:
         super().__init__()
         self._address = address
         self._node_address = node_address
@@ -78,6 +101,7 @@ class Server(Thread):
 
 class SDKAppTestCase(unittest.TestCase):
     _address = ('127.0.0.1', 5101)
+    _endpoint_prefix = ('/v1', 'test')
     _wd_path: str = None
     _server: Server = None
     _proxy: TestAppProxy = None
@@ -91,10 +115,11 @@ class SDKAppTestCase(unittest.TestCase):
         cls._known_user = Keystore.create(cls._wd_path, 'John Doe', 'john.doe@somewhere.com', 'password')
 
         # create and start server
-        endpoint_prefix = '/v1/test'
-        cls._server = Server(cls._address, None, endpoint_prefix, cls._wd_path)
+        cls._server = Server(cls._address, None, cls._endpoint_prefix, cls._wd_path)
         cls._server.start()
-        cls._proxy = TestAppProxy(cls._address, endpoint_prefix, 'foo.bar@somewhere.com', 'password')
+        cls._proxy = TestAppProxy(cls._address, cls._endpoint_prefix, 'foo.bar@somewhere.com', 'password')
+        cls._base_proxy = TestAppBaseProxy(cls._address, (cls._endpoint_prefix[0], None),
+                                           'foo.bar@somewhere.com', 'password')
         time.sleep(20)
 
     @classmethod
@@ -113,7 +138,7 @@ class SDKAppTestCase(unittest.TestCase):
         pass
 
     def test_get_token(self):
-        token = self._proxy.token
+        token = self._proxy.session.token
         assert(token is not None)
 
     def test_unprotected_endpoint(self):
@@ -125,6 +150,65 @@ class SDKAppTestCase(unittest.TestCase):
         response = self._proxy.protected()
         print(response)
         assert('foo.bar@somewhere.com' in response.message)
+
+    def test_get_user_profile(self):
+        profile = self._base_proxy.profile()
+        print(profile)
+        assert(profile is not None)
+        assert(profile.login == 'foo.bar@somewhere.com')
+        assert(profile.name == 'Foo Bar')
+
+    def test_update_user_name(self):
+        profile = self._base_proxy.update_name('new_name')
+        print(profile)
+        assert(profile is not None)
+        assert(profile.login == 'foo.bar@somewhere.com')
+        assert(profile.name == 'new_name')
+
+        profile = self._base_proxy.profile()
+        print(profile)
+        assert(profile is not None)
+        assert(profile.name == 'new_name')
+
+    def test_update_user_password(self):
+        # should fail
+        try:
+            self._base_proxy.update_password(('wrong_password', 'lalala'))
+            assert False
+        except Exception as e:
+            print(e)
+            assert True
+
+        # should work
+        try:
+            profile = self._base_proxy.update_password(('password', 'lalala'))
+            print(profile)
+            assert(profile is not None)
+        except Exception as e:
+            print(e)
+            assert False
+
+        # should fail now
+        proxy0 = TestAppBaseProxy(self._address, (self._endpoint_prefix[0], None), 'foo.bar@somewhere.com', 'password')
+        try:
+            proxy0.profile()
+            assert False
+        except Exception as e:
+            print(e)
+            assert True
+
+        # should work
+        proxy1 = TestAppBaseProxy(self._address, (self._endpoint_prefix[0], None), 'foo.bar@somewhere.com', 'lalala')
+        try:
+            proxy1.profile()
+            print(profile)
+            assert True
+        except Exception as e:
+            print(e)
+            assert False
+
+        # change it back to the original password
+        self._base_proxy.update_password(('lalala', 'password'))
 
 
 if __name__ == '__main__':
