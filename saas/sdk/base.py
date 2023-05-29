@@ -283,14 +283,26 @@ class SDKJob:
             status = self._rti.cancel_job(self._job.id, self._authority)
             return status
 
-    def wait(self, pace: float = 1.0, callback_progress: Callable[[int], None] = None) -> Dict[str, SDKCDataObject]:
+    def wait(self, pace: float = 1.0, callback_progress: Callable[[int], None] = None,
+             callback_message: Callable[[str], None] = None) -> Dict[str, SDKCDataObject]:
         # wait until the job has finished
+        prev_message = None
         while True:
             status = self.status
 
             # do we have a progress callback?
             if callback_progress:
                 callback_progress(status.progress)
+
+            # do we have a message callback?
+            if callback_message:
+                # do we have notes?
+                if status.notes and 'message' in status.notes:
+                    # do we have a different message than before?
+                    message = status.notes['message']
+                    if message != prev_message:
+                        callback_message(message)
+                        prev_message = message
 
             if status.state in [JobStatus.State.INITIALISED, JobStatus.State.RUNNING]:
                 time.sleep(pace)
