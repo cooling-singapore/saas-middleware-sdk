@@ -23,7 +23,7 @@ class DORProxy(EndpointProxy):
 
     def search(self, patterns: list[str] = None, owner_iid: str = None,
                data_type: str = None, data_format: str = None,
-               c_hashes: list[str] = None) -> List[Union[CDataObject, GPPDataObject]]:
+               c_hashes: list[str] = None) -> List[DataObject]:
         body = {}
 
         if patterns is not None and len(patterns) > 0:

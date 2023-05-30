@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 from saas.core.helpers import write_json_to_file, read_json_from_file
 from saas.core.keystore import Keystore
@@ -19,7 +19,7 @@ a convenient set of classes and functions.
 """
 
 
-def create_and_publish_identity(node_address: (str, int), keystore_path: str, password: str) -> Keystore:
+def create_and_publish_identity(node_address: Tuple[str, int], keystore_path: str, password: str) -> Keystore:
     # create a new keystore
     keystore = Keystore.create(keystore_path, 'John Doe', 'john.doe@somewhere.com', password)
 
@@ -52,7 +52,7 @@ def create_and_publish_identity(node_address: (str, int), keystore_path: str, pa
     return keystore
 
 
-def upload_gpp_and_deploy_adapter(node_address: (str, int), user: Keystore) -> str:
+def upload_gpp_and_deploy_adapter(node_address: Tuple[str, int], user: Keystore) -> str:
     # check if the node supports RTI services. the NodeDB can be used to retrieve this information
     db = NodeDBProxy(node_address)
     node_info: NodeInfo = db.get_node()
@@ -117,7 +117,7 @@ def upload_gpp_and_deploy_adapter(node_address: (str, int), user: Keystore) -> s
     return proc_id
 
 
-def submit_job(node_address: (str, int), proc_id: str, user: Keystore) -> (str, str):
+def submit_job(node_address: Tuple[str, int], proc_id: str, user: Keystore) -> Tuple[str, str]:
     # background: in this example, we use the example adapter found in '/examples/adapters' of the same repository
     # that contains this example application. the processor is simple: it takes two input data objects that
     # contain values, adds them up, and produces the sum as output. A + B = C
@@ -194,7 +194,7 @@ def submit_job(node_address: (str, int), proc_id: str, user: Keystore) -> (str, 
     return job.id, a_obj_id
 
 
-def wait_for_job(node_address: (str, int), job_id: str, user: Keystore) -> None:
+def wait_for_job(node_address: Tuple[str, int], job_id: str, user: Keystore) -> None:
     rti = RTIProxy(node_address)
     while True:
         time.sleep(5)
@@ -207,7 +207,7 @@ def wait_for_job(node_address: (str, int), job_id: str, user: Keystore) -> None:
             raise RuntimeError("Ohoh... something went wrong with the job.")
 
 
-def retrieve_results(node_address: (str, int), job_id: str, user: Keystore, download_path: str) -> str:
+def retrieve_results(node_address: Tuple[str, int], job_id: str, user: Keystore, download_path: str) -> str:
     # the resulting data object 'c' has been stored in the DOR. let's figure out the data object id
     rti = RTIProxy(node_address)
     status: JobStatus = rti.get_job_status(job_id, with_authorisation_by=user)
@@ -222,26 +222,26 @@ def retrieve_results(node_address: (str, int), job_id: str, user: Keystore, down
     return c_meta.obj_id
 
 
-def retrieve_logs(node_address: (str, int), job_id: str, user: Keystore, download_path: str) -> None:
+def retrieve_logs(node_address: Tuple[str, int], job_id: str, user: Keystore, download_path: str) -> None:
     # get the logs (if any) and store them
     rti = RTIProxy(node_address)
     rti.get_job_logs(job_id, user, download_path)
     print(f"the content of data object 'c' is downloaded to '{download_path}'")
 
 
-def tag_data_object(node_address: (str, int), obj_id: str, tags: List[DataObject.Tag], user: Keystore) -> None:
+def tag_data_object(node_address: Tuple[str, int], obj_id: str, tags: List[DataObject.Tag], user: Keystore) -> None:
     dor = DORProxy(node_address)
     meta = dor.update_tags(obj_id, user, tags)
     print(f"data object '{obj_id}' is now tagged which is reflected in the meta information: {meta}")
 
 
-def search(node_address: (str, int), patterns: List[str]) -> List[DataObject]:
+def search(node_address: Tuple[str, int], patterns: List[str]) -> List[DataObject]:
     dor = DORProxy(node_address)
     result: List[DataObject] = dor.search(patterns=patterns)
     return result
 
 
-def clean_up(node_address: (str, int), proc_id: str, obj_ids: List[str], user: Keystore) -> None:
+def clean_up(node_address: Tuple[str, int], proc_id: str, obj_ids: List[str], user: Keystore) -> None:
     # undeploy the processor
     rti = RTIProxy(node_address)
     rti.undeploy(proc_id, user)
@@ -272,7 +272,7 @@ def main():
     # create and publish a new identity...
     host = '127.0.0.1'
     port = 5001
-    address = [host, port]  # the REST API address of your node
+    address = (host, port)  # the REST API address of your node
     directory = os.environ['HOME']
     pwd = "you probably shouldn't hardcode this..."
     keystore = create_and_publish_identity(address, directory, pwd)
