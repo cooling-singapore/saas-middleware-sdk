@@ -1,6 +1,7 @@
 import os
 import time
 from typing import Optional, List, Tuple
+from pprint import pprint
 
 from saas.core.helpers import write_json_to_file, read_json_from_file
 from saas.core.keystore import Keystore
@@ -40,14 +41,14 @@ def create_and_publish_identity(node_address: Tuple[str, int], keystore_path: st
 
     # what identities does the node about?
     identities = db.get_identities()  # corresponding REST API call: curl 10.8.0.6:5001/api/v1/db/identity
-    print(f"known identities: {identities}")
+    pprint(f"known identities: {identities}")
 
     # publish the identity...
     db.update_identity(identity)
 
     # ... and check again. you should see your identity now part of the result
     identities = db.get_identities()
-    print(f"known identities: {identities}")
+    pprint(f"known identities: {identities}")
 
     return keystore
 
@@ -312,7 +313,7 @@ def main():
 
     # load the result
     c = read_json_from_file(download_path)
-    print(c)
+    pprint(c)
 
     """
     (6) In addition to downloading the results you can also download the execution logs in case you want to know
@@ -338,7 +339,7 @@ def main():
     # values of tags. as long as a pattern is contained by at least one tag (key or value), the object is
     # included in the result set.
     result = search(address, ['hello world'])
-    print(result)
+    pprint(result)
 
     """
     (8) Once we are done, we can clean up. Undeploy the processor and delete data objects

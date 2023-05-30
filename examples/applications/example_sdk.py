@@ -1,4 +1,5 @@
 import os
+from pprint import pprint
 
 from saas.core.helpers import write_json_to_file, read_json_from_file
 from saas.core.keystore import Keystore
@@ -109,7 +110,7 @@ def main():
 
     # load the result
     c = read_json_from_file(download_path)
-    print(c)
+    pprint(c)
 
     """
     (5) In addition to downloading the results you can also download the execution logs in case you want to know
@@ -136,7 +137,7 @@ def main():
     # included in the result set.
     results = context.find_data_objects(['Foo'])
     results = [result.meta.dict() for result in results]
-    print(results)
+    pprint(results)
 
     """
     (7) Once we are done, we can clean up. Undeploy the processor and delete data objects
