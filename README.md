@@ -2,9 +2,9 @@
 
 This repository provides the Python implementation of the `saas-middleware` software development kit (SDK). Developers will be able to use this SDK to create applications to interact with a SaaS node, and also create their own SaaS adapter. 
 
-It consists of two main python packages, `saascore` and `saasadapters`.
+It consists of the main python package `saas.core`.
 
-## `saascore`
+## `saas.core`
 This package provides the necessary functions to interact with a SaaS node. For example, to deploy adapters, upload data objects and submit jobs. 
 
 ### Keystore
@@ -12,32 +12,31 @@ Before interacting with SaaS nodes, it is __required__ for the user to create a 
 
 The keystore contains the Identity of a user which consists of an ID, name, email and a set of key pairs (public/private pair used for cryptographic operations). Besides an identity, the keystore can also store information in the form of assets. The contents in the keystore would then be encrypted with the help of a password provided by the user.
 
-This package provides a module `saascore.keystore.keystore` with a class to create such a keystore. Examples of assets that the keystore supports can be found in `saas.keystore.assets`. Additionally, the way SaaS handles key pairs and cryptographic operations (encryption and hashing) can be found in `saascore.cryptography`.
+This package provides a module `saas.core.keystore` with a `Keystore` class to create such a keystore. Examples of assets that the keystore supports can be found in `saas.core.assets`. The way SaaS handles key pairs and cryptographic operations (encryption and hashing) can be found in `KeyPair` classes `saas.core.eckeypair.ECKeyPair` and `saas.core.rsakeypair.RSAKeyPair`.
 
 Example of creating a Keystore:
 ```python
-from saascore.keystore.keystore import Keystore
-from saascore.keystore.assets.credentials import CredentialsAsset, GithubCredentials
+from saas.core.keystore import Keystore
+from saas.core.schemas import GithubCredentials,
 
 # Create the keystore in provided path (defaults to $HOME/.keystore)
 keystore = Keystore.create(keystore_path, name, email, password)
 
-# Create a Github credential asset (useful for accessing private Github repositories when deploying adapters)
-github_cred = CredentialsAsset[GithubCredentials].create('github-credentials', GithubCredentials)
+# Add a Github credential asset (useful for accessing private Github repositories when deploying adapters)
+keystore.github_credentials.update(
+    url, 
+    GithubCredentials(
+      login=login, 
+      personal_access_token=personal_access_token
+    )
+)
 
-github_cred.update(repo_url, GithubCredentials(
-    username,
-    personal_access_token
-))
-
-# Add asset to keystore
-keystore.update_asset(github_cred)
 ```
 
 ### API 
-SaaS node uses REST as its main form of communication via a HTTP API interface. The specifications of the REST interface are written in the [OpenAPI](https://swagger.io/specification/) format and can be found [here](./saascore/api/spec/openapi.yaml).
+SaaS node uses REST as its main form of communication via a HTTP API interface.
 
-Sending HTTP requests to SaaS nodes are abstracted into functions and can be accessed by importing from the module `saascore.api.sdk.proxies`. These functions are grouped into classes based on the three main services SaaS node provides i.e. __NodeDB__ (Node Database), __DOR__ (Data Object Repository), __RTI__ (Runtime Infrastructure).
+Sending HTTP requests to SaaS nodes are abstracted into functions. These functions are grouped into classes based on the three main services SaaS node provides i.e. __NodeDB__ (Node Database), __DOR__ (Data Object Repository), __RTI__ (Runtime Infrastructure) and they can be found in `saas.nodedb.proxy`, `saas.dor.proxy`, `saas.rti.proxy` respectively.
 
 In general, these services can be briefly described as follows:
 
@@ -49,12 +48,14 @@ The Runtime Infrastructure (__RTI__) deploy/undeploy adapters and help execute j
 
 Example of sending requests to a node:
 ```python
-from saascore.api.sdk.proxies import NodeDBProxy, DORProxy, RTIProxy
+from saas.dor.proxy import DORProxy
+from saas.nodedb.proxy import NodeDBProxy
+from saas.rti.proxy import RTIProxy
 
 # Create the proxy object with the IP address of the SaaS node you want to interact with.
 db_proxy = NodeDBProxy(node_address)
 dor_proxy = DORProxy(node_address)
-rti_proxy = RITProxy(node_address)
+rti_proxy = RTIProxy(node_address)
 
 # Interact with the node by calling methods from the proxy objects
 node_info = db_proxy.get_node()
@@ -62,13 +63,13 @@ data_objects = dor_proxy.search()
 deployed = rti_proxy.get_deployed()
 ```
 
-To see the list of functions and the parameters required for each of them, refer to the code found in the module `saascore.api.sdk.proxies`.
+To see the list of functions and the parameters required for each of them, refer to the code found in their respective modules.
 
-A full example of a simple application using this module can be found [here](./saascore/api/example/simple_app.py).
+A full example of a simple application using this module can be found [here](./examples/applications/example_api.py).
 
 
-## `saasadapters`
-This package provides helper functions and an example template for creating a valid SaaS adapters. These are needed for the RTI to successfully deploy such adapters and use them to execute computational jobs. 
+## SaaS Adapters
+A SaaS Adapter provides a wrapper interface around an application (e.g. program or script) with a clearly defined specification of inputs/outputs and instructions on how to install/execute it. They can be then deployed using the RTI and users would be able to execute computational jobs. 
 
 ### Adapter Structure
 A valid adapter should follow a similar folder structure and contain these types of files (with exact file names and in the same directory) as shown below:
@@ -239,4 +240,4 @@ Example of `output` trigger:
 trigger:output:c
 ```
 
-These triggers can be found as helper functions in the module `saasadapters.sdk.helpers` and can be used in the `processor.py`.
+These triggers can be found as helper functions in the module `saas.sdk.adapter` and can be used in the `processor.py`.
