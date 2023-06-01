@@ -8,15 +8,15 @@ logger = logging.getLogger('example-processor')
 
 
 def function(working_directory):
-    print(f"trigger:progress:0")
-    print(f"trigger:message:This is a message at the very beginning of the process.")
+    print("trigger:progress:0")
+    print("trigger:message:This is a message at the very beginning of the process.")
 
     a_path = os.path.join(working_directory, 'a')
     with open(a_path, 'r') as f:
         a = json.load(f)
         a = a['v']
     print(f"a={a}")
-    print(f"trigger:progress:20")
+    print("trigger:progress:20")
     time.sleep(a)
 
     b_path = os.path.join(working_directory, 'b')
@@ -24,14 +24,14 @@ def function(working_directory):
         b = json.load(f)
         b = b['v']
     print(f"b={b}")
-    print(f"trigger:progress:40")
+    print("trigger:progress:40")
     time.sleep(b)
 
     c = {
         'v': a + b
     }
     print(f"c={c}")
-    print(f"trigger:progress:60")
+    print("trigger:progress:60")
     print(f"trigger:message:a={a}")
     print(f"trigger:message:b={b}")
     print(f"trigger:message:c={c}")
@@ -40,12 +40,12 @@ def function(working_directory):
     c_path = os.path.join(working_directory, 'c')
     with open(c_path, 'w') as f:
         json.dump(c, f, indent=4, sort_keys=True)
-    print(f"trigger:progress:80")
-    print(f"trigger:output:c")
+    print("trigger:progress:80")
+    print("trigger:output:c")
     time.sleep(0.2)
 
-    print(f"trigger:progress:100")
-    print(f"trigger:message:...and we are done!")
+    print("trigger:progress:100")
+    print("trigger:message:...and we are done!")
 
 
 if __name__ == '__main__':

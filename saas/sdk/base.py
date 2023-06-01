@@ -482,7 +482,7 @@ class SDKContext:
                             return SDKJob(proc, job, self._authority)
 
                     # if we get here then we haven't been able to find the processor for this job
-                    raise SaaSRuntimeException(f"No processor deployed for job", details={
+                    raise SaaSRuntimeException("No processor deployed for job", details={
                         'job_id': job_id,
                         'proc_id': job.task.proc_id
                     })
@@ -620,7 +620,7 @@ class SDKRelayContext:
                         return SDKJob(proc, job, self._authority, self._session)
 
                 # if we get here then we haven't been able to find the processor for this job
-                raise SaaSRuntimeException(f"No processor deployed for job", details={
+                raise SaaSRuntimeException("No processor deployed for job", details={
                     'job_id': job_id,
                     'proc_id': job.task.proc_id
                 })

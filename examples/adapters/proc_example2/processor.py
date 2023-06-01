@@ -8,14 +8,14 @@ logger = logging.getLogger('example-processor-2')
 
 
 def function(working_directory):
-    print(f"trigger:progress:0")
+    print("trigger:progress:0")
 
     a_path = os.path.join(working_directory, 'a')
     with open(a_path, 'r') as f:
         a = json.load(f)
         a = a['v']
     print(f"a={a}")
-    print(f"trigger:progress:10")
+    print("trigger:progress:10")
     sys.stdout.flush()
 
     b_path = os.path.join(working_directory, 'b')
@@ -23,7 +23,7 @@ def function(working_directory):
         b = json.load(f)
         b = b['v']
     print(f"b={b}")
-    print(f"trigger:progress:20")
+    print("trigger:progress:20")
     sys.stdout.flush()
 
     # calculate the result
@@ -31,7 +31,7 @@ def function(working_directory):
         'v': a + b
     }
     print(f"c={c}")
-    print(f"trigger:progress:30")
+    print("trigger:progress:30")
     sys.stdout.flush()
 
     # simply wait for a while...
@@ -44,11 +44,11 @@ def function(working_directory):
     c_path = os.path.join(working_directory, 'c')
     with open(c_path, 'w') as f:
         json.dump(c, f, indent=4, sort_keys=True)
-    print(f"trigger:progress:90")
-    print(f"trigger:output:c")
+    print("trigger:progress:90")
+    print("trigger:output:c")
     sys.stdout.flush()
 
-    print(f"trigger:progress:100")
+    print("trigger:progress:100")
     sys.stdout.flush()
 
 
