@@ -161,7 +161,7 @@ class Application(abc.ABC):
             return self._context[user.login]
 
     async def _close(self) -> None:
-        logger.info(f"REST app is shutting down.")
+        logger.info("REST app is shutting down.")
 
     def add_dot(self, dot: DataObjectType) -> None:
         with self._mutex:
@@ -230,7 +230,7 @@ class Application(abc.ABC):
                 allow_headers=["*"],
             )
 
-            logger.info(f"REST service starting up...")
+            logger.info("REST service starting up...")
             self._thread = Thread(target=uvicorn.run, args=(self._api,),
                                   kwargs={"host": self._address[0], "port": self._address[1], "log_level": "info"},
                                   daemon=True)
@@ -239,14 +239,14 @@ class Application(abc.ABC):
             # await asyncio.sleep(0.1)
 
         else:
-            logger.warning(f"REST service asked to start up but thread already exists! Ignoring...")
+            logger.warning("REST service asked to start up but thread already exists! Ignoring...")
 
     def shutdown(self) -> None:
         if self._thread is None:
-            logger.warning(f"REST service asked to shut down but thread does not exist! Ignoring...")
+            logger.warning("REST service asked to shut down but thread does not exist! Ignoring...")
 
         else:
-            logger.info(f"REST service shutting down...")
+            logger.info("REST service shutting down...")
             # there is no way to terminate a thread...
             # self._thread.terminate()
 

@@ -126,7 +126,7 @@ class SDKBaseTestCase(unittest.TestCase):
             obj.delete()
             assert False
 
-        except SaaSRuntimeException as e:
+        except SaaSRuntimeException:
             assert True
 
         # delete the object (should work)

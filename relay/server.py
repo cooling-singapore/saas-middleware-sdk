@@ -259,7 +259,7 @@ class RelayServer(Application):
     def _find_dor_with_object(self, obj_id: str) -> (Optional[NodeInfo], Optional[Union[CDataObject, GPPDataObject]]):
         dors = self._find_all_dors()
         if len(dors) == 0:
-            raise RelayRuntimeError(f"No DORs found")
+            raise RelayRuntimeError("No DORs found")
 
         for node in dors:
             dor = DORProxy(node.rest_address)
@@ -319,7 +319,7 @@ class RelayServer(Application):
         # find all dors
         dors = self._find_all_dors()
         if len(dors) == 0:
-            raise RelayRuntimeError(f"No DORs found")
+            raise RelayRuntimeError("No DORs found")
 
         # temp file for attachment
         attachment_path = os.path.join(self._wd_path, f"{get_timestamp_now()}_{generate_random_string(4)}")
@@ -360,7 +360,7 @@ class RelayServer(Application):
         will use these credentials to access (i.e., clone) the repository. Note that the credentials information will
         not be stored by the DOR.
         """
-        raise RelayRuntimeError(f"Adding GPP data objects is not supported by the Relay application.")
+        raise RelayRuntimeError("Adding GPP data objects is not supported by the Relay application.")
 
     def remove(self, obj_id: str,
                user: User = Depends(get_current_active_user)) -> Optional[Union[CDataObject, GPPDataObject]]:
@@ -372,7 +372,7 @@ class RelayServer(Application):
         # find all dors
         dors = self._find_all_dors()
         if len(dors) == 0:
-            raise RelayRuntimeError(f"No DORs found")
+            raise RelayRuntimeError("No DORs found")
 
         for node in dors:
             dor = DORProxy(node.rest_address)
@@ -391,7 +391,7 @@ class RelayServer(Application):
         # find all dors
         dors = self._find_all_dors()
         if len(dors) == 0:
-            raise RelayRuntimeError(f"No DORs found")
+            raise RelayRuntimeError("No DORs found")
 
         for node in dors:
             dor = DORProxy(node.rest_address)
@@ -410,7 +410,7 @@ class RelayServer(Application):
         # find all dors
         dors = self._find_all_dors()
         if len(dors) == 0:
-            raise RelayRuntimeError(f"No DORs found")
+            raise RelayRuntimeError("No DORs found")
 
         for node in dors:
             dor = DORProxy(node.rest_address)
@@ -437,7 +437,7 @@ class RelayServer(Application):
         # find all dors
         dors = self._find_all_dors()
         if len(dors) == 0:
-            raise RelayRuntimeError(f"No DORs found")
+            raise RelayRuntimeError("No DORs found")
 
         for node in dors:
             dor = DORProxy(node.rest_address)
@@ -607,7 +607,7 @@ class RelayServer(Application):
         need to be provided. Note that GitHub credentials are not stored. Note that all credentials information must
         not be sent in plaintext but instead encrypted using the corresponding public encryption key of the RTI node.
         """
-        raise RelayRuntimeError(f"Processor deployment and undeployment not supported by Relay app.")
+        raise RelayRuntimeError("Processor deployment and undeployment not supported by Relay app.")
 
     def undeploy(self, proc_id: str, user: User = Depends(get_current_active_user)) -> Processor:
         """
@@ -615,7 +615,7 @@ class RelayServer(Application):
         SSH credentials have been used by this processor for remote deployment, then the stored SSH credentials will
         be deleted as well.
         """
-        raise RelayRuntimeError(f"Processor deployment and undeployment not supported by Relay app.")
+        raise RelayRuntimeError("Processor deployment and undeployment not supported by Relay app.")
 
     def gpp(self, proc_id: str) -> GitProcessorPointer:
         """
@@ -801,4 +801,4 @@ class RelayServer(Application):
           'node_id': '9mip ... x85y'
         }`
         """
-        raise RelayRuntimeError(f"Permission submission not supported by Relay app.")
+        raise RelayRuntimeError("Permission submission not supported by Relay app.")

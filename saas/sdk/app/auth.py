@@ -99,7 +99,7 @@ class UserDB:
             # does the user exist?
             record = q.first()
             if not record:
-                raise AppRuntimeError(f"User account does not exist", details={
+                raise AppRuntimeError("User account does not exist", details={
                     'login': login
                 })
 

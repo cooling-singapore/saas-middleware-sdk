@@ -76,13 +76,13 @@ class UserCreate(CLICommand):
             Argument('--node_address', dest='node_address', action='store',
                      help=f"address used for publishing the identity (default: '{self.default_node_address}')."),
             Argument('--secret_key', dest='secret_key', action='store', required=False,
-                     help=f"the secret key used to secure passwords"),
+                     help="the secret key used to secure passwords"),
             Argument('--login', dest='login', action='store', required=False,
-                     help=f"the login for this account"),
+                     help="the login for this account"),
             Argument('--name', dest='name', action='store', required=False,
-                     help=f"the name of the user"),
+                     help="the name of the user"),
             Argument('--password', dest='password', action='store', required=False,
-                     help=f"the password of the user")
+                     help="the password of the user")
         ])
 
     def execute(self, args: dict) -> None:
@@ -104,7 +104,7 @@ class UserCreate(CLICommand):
             print(f"Using generated secret key: {args['secret_key']}")
 
         elif len(args['secret_key']) != 32:
-            raise CLIRuntimeError(f"Secret key must  have a size of 32 characters")
+            raise CLIRuntimeError("Secret key must  have a size of 32 characters")
 
         prompt_if_missing(args, 'login', prompt_for_string, message="Enter the login:")
         prompt_if_missing(args, 'name', prompt_for_string, message="Enter the name:")
@@ -135,7 +135,7 @@ class UserRemove(CLICommand):
             Argument('--userstore', dest='userstore', action='store', default=default_userstore,
                      help=f"path to the userstore (default: '{default_userstore}')"),
             Argument('--login', dest='login', action='store', required=False,
-                     help=f"the login for this account")
+                     help="the login for this account")
         ])
 
     def execute(self, args: dict) -> None:
@@ -154,7 +154,7 @@ class UserRemove(CLICommand):
             if not choices:
                 raise CLIRuntimeError(f"No users found in {args['userstore']}")
 
-            args['login'] = prompt_for_selection(choices, f"Select the user to be removed:", allow_multiple=False)
+            args['login'] = prompt_for_selection(choices, "Select the user to be removed:", allow_multiple=False)
 
         # check if the user exists
         UserDB.initialise(args['userstore'])
@@ -172,7 +172,7 @@ class UserEnable(CLICommand):
             Argument('--userstore', dest='userstore', action='store', default=default_userstore,
                      help=f"path to the userstore (default: '{default_userstore}')"),
             Argument('--login', dest='login', action='store', required=False,
-                     help=f"the login of the account")
+                     help="the login of the account")
         ])
 
     def execute(self, args: dict) -> None:
@@ -188,7 +188,7 @@ class UserEnable(CLICommand):
             if not choices:
                 raise CLIRuntimeError(f"No users found in {args['userstore']}")
 
-            args['login'] = prompt_for_selection(choices, f"Select the user to be removed:", allow_multiple=False)
+            args['login'] = prompt_for_selection(choices, "Select the user to be removed:", allow_multiple=False)
 
         # enable the user
         user = UserDB.enable_user(args['login'])
@@ -201,7 +201,7 @@ class UserDisable(CLICommand):
             Argument('--userstore', dest='userstore', action='store', default=default_userstore,
                      help=f"path to the userstore (default: '{default_userstore}')"),
             Argument('--login', dest='login', action='store', required=False,
-                     help=f"the login of the account")
+                     help="the login of the account")
         ])
 
     def execute(self, args: dict) -> None:
@@ -217,7 +217,7 @@ class UserDisable(CLICommand):
             if not choices:
                 raise CLIRuntimeError(f"No users found in {args['userstore']}")
 
-            args['login'] = prompt_for_selection(choices, f"Select the user to be removed:", allow_multiple=False)
+            args['login'] = prompt_for_selection(choices, "Select the user to be removed:", allow_multiple=False)
 
         # enable the user
         user = UserDB.disable_user(args['login'])
@@ -230,9 +230,9 @@ class UserUpdateName(CLICommand):
             Argument('--userstore', dest='userstore', action='store', default=default_userstore,
                      help=f"path to the userstore (default: '{default_userstore}')"),
             Argument('--login', dest='login', action='store', required=False,
-                     help=f"the login of the account"),
+                     help="the login of the account"),
             Argument('--new_display_name', dest='user_display_name', action='store', required=True,
-                     help=f"the new display name of the account")
+                     help="the new display name of the account")
         ])
 
     def execute(self, args: dict) -> None:
@@ -248,7 +248,7 @@ class UserUpdateName(CLICommand):
             if not choices:
                 raise CLIRuntimeError(f"No users found in {args['userstore']}")
 
-            args['login'] = prompt_for_selection(choices, f"Select the user to be updated:", allow_multiple=False)
+            args['login'] = prompt_for_selection(choices, "Select the user to be updated:", allow_multiple=False)
 
         # update the user
         user = UserDB.update_user(args['login'], True, user_display_name=args['user_display_name'])
@@ -261,9 +261,9 @@ class UserUpdatePassword(CLICommand):
             Argument('--userstore', dest='userstore', action='store', default=default_userstore,
                      help=f"path to the userstore (default: '{default_userstore}')"),
             Argument('--login', dest='login', action='store', required=False,
-                     help=f"the login of the account"),
+                     help="the login of the account"),
             Argument('--new_password', dest='new_password', action='store', required=False,
-                     help=f"the new password of the account")
+                     help="the new password of the account")
         ])
 
     def execute(self, args: dict) -> None:
@@ -279,7 +279,7 @@ class UserUpdatePassword(CLICommand):
             if not choices:
                 raise CLIRuntimeError(f"No users found in {args['userstore']}")
 
-            args['login'] = prompt_for_selection(choices, f"Select the user to be updated:", allow_multiple=False)
+            args['login'] = prompt_for_selection(choices, "Select the user to be updated:", allow_multiple=False)
 
         # check the password
         prompt_if_missing(args, 'new_password', prompt_for_string, allow_empty=True, hide=True,
