@@ -75,8 +75,6 @@ class UserCreate(CLICommand):
                      help=f"path to the userstore (default: '{default_userstore}')"),
             Argument('--node_address', dest='node_address', action='store',
                      help=f"address used for publishing the identity (default: '{self.default_node_address}')."),
-            Argument('--secret_key', dest='secret_key', action='store', required=False,
-                     help="the secret key used to secure passwords"),
             Argument('--login', dest='login', action='store', required=False,
                      help="the login for this account"),
             Argument('--name', dest='name', action='store', required=False,
@@ -96,16 +94,6 @@ class UserCreate(CLICommand):
                           message="Enter address of the SaaS node REST service:",
                           default=self.default_node_address)
 
-        # check the secret key
-        prompt_if_missing(args, 'secret_key', prompt_for_string, allow_empty=True, hide=True,
-                          message="Enter the secret key [leave empty to generate]:")
-        if len(args['secret_key']) == 0:
-            args['secret_key'] = generate_random_string(32)
-            print(f"Using generated secret key: {args['secret_key']}")
-
-        elif len(args['secret_key']) != 32:
-            raise CLIRuntimeError("Secret key must  have a size of 32 characters")
-
         prompt_if_missing(args, 'login', prompt_for_string, message="Enter the login:")
         prompt_if_missing(args, 'name', prompt_for_string, message="Enter the name:")
 
@@ -117,7 +105,6 @@ class UserCreate(CLICommand):
             print(f"Using generated password: {args['password']}")
 
         # create the user
-        UserAuth.initialise(args['secret_key'])
         user: User = UserDB.add_user(args['login'], args['name'], args['password'])
         print(f"User account created: {user.login}")
 
