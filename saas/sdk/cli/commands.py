@@ -2,7 +2,7 @@ import os
 
 from InquirerPy.base import Choice
 from saas.core.helpers import generate_random_string
-from saas.sdk.app.auth import UserDB, UserAuth, User
+from saas.sdk.app.auth import UserDB, User
 from saas.sdk.base import connect
 from tabulate import tabulate
 
