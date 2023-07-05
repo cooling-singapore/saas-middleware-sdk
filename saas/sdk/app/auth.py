@@ -6,7 +6,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from sqlalchemy import Column, String, Boolean, create_engine
+from sqlalchemy import Column, String, Boolean, create_engine, Integer
 from sqlalchemy.orm import sessionmaker, declarative_base
 from jose import jwt
 
@@ -28,6 +28,7 @@ class UserRecord(Base):
     keystore_id = Column(String(64), nullable=False)
     keystore_password = Column(String, nullable=False)
     hashed_password = Column(String(64), nullable=False)
+    login_attempts = Column(Integer, nullable=False)
 
 
 class User(BaseModel):
@@ -39,6 +40,7 @@ class User(BaseModel):
     disabled: bool
     hashed_password: str
     keystore: Keystore
+    login_attempts: int
 
     @property
     def identity(self) -> Identity:
@@ -85,7 +87,8 @@ class UserDB:
                     name=record.name,
                     disabled=record.disabled,
                     hashed_password=record.hashed_password,
-                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
+                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password),
+                    login_attempts=record.login_attempts
                 )
 
             else:
@@ -109,7 +112,8 @@ class UserDB:
                 name=record.name,
                 disabled=record.disabled,
                 hashed_password=record.hashed_password,
-                keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
+                keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password),
+                login_attempts=record.login_attempts
             )
 
             # remove the keystore and delete it
@@ -132,7 +136,8 @@ class UserDB:
                 name=record.name,
                 disabled=record.disabled,
                 hashed_password=record.hashed_password,
-                keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
+                keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password),
+                login_attempts=record.login_attempts
             ) for record in records]
 
     @classmethod
@@ -155,7 +160,7 @@ class UserDB:
             hashed_password = UserAuth.get_password_hash(password)
             session.add(UserRecord(login=login, name=name, disabled=disabled,
                                    keystore_id=keystore.identity.id, keystore_password=keystore_password,
-                                   hashed_password=hashed_password))
+                                   hashed_password=hashed_password, login_attempts=0))
             session.commit()
 
             # publish the identity (if we have a node address)
@@ -168,7 +173,8 @@ class UserDB:
                 name=name,
                 disabled=disabled,
                 hashed_password=hashed_password,
-                keystore=keystore
+                keystore=keystore,
+                login_attempts=0
             )
 
     @classmethod
@@ -178,6 +184,7 @@ class UserDB:
             record = session.query(UserRecord).get(login)
             if record:
                 record.disabled = False
+                record.login_attempts = 0
                 session.commit()
 
                 return User(
@@ -185,7 +192,8 @@ class UserDB:
                     name=record.name,
                     disabled=record.disabled,
                     hashed_password=record.hashed_password,
-                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
+                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password),
+                    login_attempts=record.login_attempts
                 )
             else:
                 raise AppRuntimeError("Username does not exist", details={
@@ -206,7 +214,8 @@ class UserDB:
                     name=record.name,
                     disabled=record.disabled,
                     hashed_password=record.hashed_password,
-                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
+                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password),
+                    login_attempts=record.login_attempts
                 )
             else:
                 raise AppRuntimeError("Username does not exist", details={
@@ -245,10 +254,39 @@ class UserDB:
                     name=record.name,
                     disabled=record.disabled,
                     hashed_password=record.hashed_password,
-                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
+                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password),
+                    login_attempts=record.login_attempts
                 )
 
             else:
+                raise AppRuntimeError("Username does not exist", details={
+                    'login': login
+                })
+
+    @classmethod
+    def update_login_attempts(cls, login: str, successful: bool) -> User:
+        with cls._Session() as session:
+            # check if this username already exists
+            user = session.query(UserRecord).get(login)
+
+            if user:
+                # reset the login attempts count, if it's a successful login
+                if successful:
+                    user.login_attempts = 0
+                # increase the login attempts count, if it's a failed login attempt
+                else:
+                    user.login_attempts += 1
+                session.commit()
+
+                return User(
+                    login=user.login,
+                    name=user.name,
+                    disabled=user.disabled,
+                    hashed_password=user.hashed_password,
+                    keystore=cls._resolve_keystore(user.keystore_id, user.keystore_password),
+                    login_attempts=user.login_attempts
+                )
+            elif not user:
                 raise AppRuntimeError("Username does not exist", details={
                     'login': login
                 })
@@ -258,6 +296,7 @@ class UserAuth:
     secret_key = None
     algorithm = 'HS256'
     _access_token_expires_minutes = 30
+    _max_login_attempts = 5
     _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
     @classmethod
@@ -271,13 +310,28 @@ class UserAuth:
     @classmethod
     def _authenticate_user(cls, login: str, password: str) -> Optional[User]:
         user = UserDB.get_user(login)
+        # not a user
         if not user:
             return None
 
-        if not cls.verify_password(password, user.hashed_password):
-            return None
+        # user is not disabled? verify password
+        if not user.disabled:
+            if not cls.verify_password(password, user.hashed_password):
+                # if password is incorrect, update the failed login attempts count
+                user = UserDB.update_login_attempts(login, False)
+                # if the login attempts count has reached the maximum value, disable the user
+                if user.login_attempts >= cls._max_login_attempts:
+                    UserDB.disable_user(login)
+                    return 'locked'
+                return None
 
-        return user
+            # if credentials and correct and user already has failed login attempts, rest the login attempts count
+            if user.login_attempts > 0:
+                user = UserDB.update_login_attempts(login, True)
+
+            return user
+        else:
+            return 'disabled'
 
     @classmethod
     def get_password_hash(cls, password: str) -> str:
@@ -292,6 +346,20 @@ class UserAuth:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username or password",
                 headers={"WWW-Authenticate": "Bearer"},
+            )
+        # The user account has been disabled due to exceeding the limit for failed login attempts
+        elif user == 'locked':
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="The user account is locked due to exceeding the limit for failed login attempts",
+                headers={"WWW-Authenticate": "Locked"},
+            )
+        # The user account has been already disabled due to exceeding the limit for failed login attempts
+        elif user == 'disabled' or user.disabled:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account has been locked",
+                headers={"WWW-Authenticate": "Locked"},
             )
 
         # create the token
