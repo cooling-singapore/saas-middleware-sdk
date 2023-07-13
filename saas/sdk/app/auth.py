@@ -20,7 +20,7 @@ from saas.sdk.base import publish_identity
 Base = declarative_base()
 
 
-class UserRecord(Base):
+class UserRecordV0(Base):
     __tablename__ = 'user'
     login = Column(String, primary_key=True)
     name = Column(String, nullable=False)
@@ -28,7 +28,20 @@ class UserRecord(Base):
     keystore_id = Column(String(64), nullable=False)
     keystore_password = Column(String, nullable=False)
     hashed_password = Column(String(64), nullable=False)
+
+
+class UserRecordV1(Base):
+    __tablename__ = 'user_v1'
+    login = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    disabled = Column(Boolean, nullable=False)
+    keystore_id = Column(String(64), nullable=False)
+    keystore_password = Column(String, nullable=False)
+    hashed_password = Column(String(64), nullable=False)
     login_attempts = Column(Integer, nullable=False)
+
+
+UserRecord = UserRecordV1
 
 
 class User(BaseModel):
@@ -65,6 +78,9 @@ class UserDB:
         Base.metadata.create_all(cls._engine)
         cls._Session = sessionmaker(bind=cls._engine)
 
+        # check if db records need to be migrated
+        cls.migrate_v0_to_v1()
+
     @classmethod
     def publish_all_user_identities(cls, node_address: (str, int)) -> None:
         for user in UserDB.all_users():
@@ -76,6 +92,27 @@ class UserDB:
             keystore_path = os.path.join(cls._keystore_path, f"{keystore_id}.json")
             cls._keystores[keystore_id] = Keystore.load(keystore_path, keystore_password)
         return cls._keystores[keystore_id]
+
+    @classmethod
+    def migrate_v0_to_v1(cls):
+        # if the previous user table(before introducing the new column login_attempts) has user data
+        # migrate those data into the new user table and delete it afterwards
+        with cls._Session() as session:
+            records = session.query(UserRecordV0).all()
+
+            # migrate user to the new table
+            if len(records) > 0:
+                for record in records:
+                    # add users to the new table
+                    session.add(UserRecordV1(login=record.login, name=record.name, disabled=record.disabled,
+                                             keystore_id=record.keystore_id, keystore_password=record.keystore_password,
+                                             hashed_password=record.hashed_password,
+                                             login_attempts=0))
+
+                    # remove users from previous table
+                    session.query(UserRecordV0).filter_by(login=record.login).delete()
+
+                session.commit()
 
     @classmethod
     def get_user(cls, login: str) -> Optional[User]:
