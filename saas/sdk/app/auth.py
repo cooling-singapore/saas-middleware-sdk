@@ -331,7 +331,7 @@ class UserAuth:
 
             return user
         else:
-            return 'disabled'
+            return user
 
     @classmethod
     def get_password_hash(cls, password: str) -> str:
@@ -355,7 +355,7 @@ class UserAuth:
                 headers={"WWW-Authenticate": "Locked"},
             )
         # The user account has been already disabled due to exceeding the limit for failed login attempts
-        elif user == 'disabled' or user.disabled:
+        elif user.disabled:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User account has been locked",
