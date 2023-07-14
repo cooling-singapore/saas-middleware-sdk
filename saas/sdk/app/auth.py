@@ -329,9 +329,7 @@ class UserAuth:
             if user.login_attempts > 0:
                 user = UserDB.update_login_attempts(login, True)
 
-            return user
-        else:
-            return user
+        return user
 
     @classmethod
     def get_password_hash(cls, password: str) -> str:
