@@ -358,17 +358,15 @@ class UserAuth:
                 user = UserDB.update_login_attempts(login, False)
                 # if the login attempts count has reached the maximum value, disable the user
                 if user.login_attempts >= cls._max_login_attempts:
-                    UserDB.disable_user(login)
-                    return 'locked'
+                    user = UserDB.disable_user(login)
+                    return user
                 return None
 
             # if credentials and correct and user already has failed login attempts, rest the login attempts count
             if user.login_attempts > 0:
                 user = UserDB.update_login_attempts(login, True)
 
-            return user
-        else:
-            return 'disabled'
+        return user
 
     @classmethod
     def get_password_hash(cls, password: str) -> str:
@@ -385,14 +383,7 @@ class UserAuth:
                 headers={"WWW-Authenticate": "Bearer"},
             )
         # The user account has been disabled due to exceeding the limit for failed login attempts
-        elif user == 'locked':
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="The user account is locked due to exceeding the limit for failed login attempts",
-                headers={"WWW-Authenticate": "Locked"},
-            )
-        # The user account has been already disabled due to exceeding the limit for failed login attempts
-        elif user == 'disabled' or user.disabled:
+        elif user.disabled:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User account has been locked",
