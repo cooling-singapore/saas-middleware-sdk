@@ -323,7 +323,7 @@ class UserDB:
                     keystore=cls._resolve_keystore(user.keystore_id, user.keystore_password),
                     login_attempts=user.login_attempts
                 )
-            elif not user:
+            else:
                 raise AppRuntimeError("Username does not exist", details={
                     'login': login
                 })
@@ -351,22 +351,33 @@ class UserAuth:
         if not user:
             return None
 
+        # if user is disabled raise error
+        if user.disabled:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account has been locked. Please contact administrator.",
+                headers={"WWW-Authenticate": "Locked"},
+            )
+
         # user is not disabled? verify password
-        if not user.disabled:
+        else:
+            # if password is incorrect, update the failed login attempts count
             if not cls.verify_password(password, user.hashed_password):
-                # if password is incorrect, update the failed login attempts count
                 user = UserDB.update_login_attempts(login, False)
-                # if the login attempts count has reached the maximum value, disable the user
+                # if the login attempts count has reached the maximum value, disable the user and raise error
                 if user.login_attempts >= cls._max_login_attempts:
-                    user = UserDB.disable_user(login)
-                    return user
+                    UserDB.disable_user(login)
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="User account has been locked. Please contact administrator.",
+                        headers={"WWW-Authenticate": "Locked"},
+                    )
                 return None
-
-            # if credentials and correct and user already has failed login attempts, rest the login attempts count
-            if user.login_attempts > 0:
-                user = UserDB.update_login_attempts(login, True)
-
-        return user
+            else:
+                # if credentials and correct and user already has failed login attempts, reset the login attempts count
+                if user.login_attempts > 0:
+                    user = UserDB.update_login_attempts(login, True)
+                return user
 
     @classmethod
     def get_password_hash(cls, password: str) -> str:
@@ -382,7 +393,7 @@ class UserAuth:
                 detail="Incorrect username or password",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        # The user account has been disabled due to exceeding the limit for failed login attempts
+        # The user account has been disabled
         elif user.disabled:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
