@@ -397,7 +397,7 @@ class UserAuth:
         elif user.disabled:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="User account has been locked",
+                detail="User account has been locked. Please contact administrator.",
                 headers={"WWW-Authenticate": "Locked"},
             )
 
