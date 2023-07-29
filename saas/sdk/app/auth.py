@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from pydantic import BaseModel
+from saas.core.logging import Logging
 from sqlalchemy import Column, String, Boolean, create_engine, Integer
 from sqlalchemy.orm import sessionmaker, declarative_base
 from jose import jwt
@@ -18,6 +19,7 @@ from saas.sdk.app.exceptions import AppRuntimeError
 from saas.sdk.base import publish_identity
 
 Base = declarative_base()
+logger = Logging.get('saas.sdk.app')
 
 
 class UserRecordV0(Base):
@@ -79,6 +81,7 @@ class UserDB:
         cls._Session = sessionmaker(bind=cls._engine)
 
         # check if db records need to be migrated
+        logger.info(f"check if user db records need to be migrated")
         cls.migrate_v0_to_v1()
 
     @classmethod
@@ -95,24 +98,32 @@ class UserDB:
 
     @classmethod
     def migrate_v0_to_v1(cls):
-        # if the previous user table(before introducing the new column login_attempts) has user data
-        # migrate those data into the new user table and delete it afterwards
+        """
+        Migrate v0 user records (if any) to v1. Changes from v0 to v1:
+        - introduce column login_attempts
+        :return:
+        """
         with cls._Session() as session:
+            # do we have any v0 records?
             records = session.query(UserRecordV0).all()
-
-            # migrate user to the new table
             if len(records) > 0:
+                logger.warning(f"found {len(records)} v0 user records -> migrating to v1...")
+
+                # migrate all records -> add v1 record and delete v0 record
                 for record in records:
-                    # add users to the new table
+                    # add users to the v1 table
                     session.add(UserRecordV1(login=record.login, name=record.name, disabled=record.disabled,
                                              keystore_id=record.keystore_id, keystore_password=record.keystore_password,
                                              hashed_password=record.hashed_password,
                                              login_attempts=0))
 
-                    # remove users from previous table
+                    # remove users from v0 table
                     session.query(UserRecordV0).filter_by(login=record.login).delete()
 
                 session.commit()
+
+            else:
+                logger.info(f"no v0 user records found.")
 
     @classmethod
     def get_user(cls, login: str) -> Optional[User]:
