@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from pydantic import BaseModel
+from saas.core.logging import Logging
 from sqlalchemy import Column, String, Boolean, create_engine, Integer
 from sqlalchemy.orm import sessionmaker, declarative_base
 from jose import jwt
@@ -18,9 +19,10 @@ from saas.sdk.app.exceptions import AppRuntimeError
 from saas.sdk.base import publish_identity
 
 Base = declarative_base()
+logger = Logging.get('saas.sdk.app')
 
 
-class UserRecord(Base):
+class UserRecordV0(Base):
     __tablename__ = 'user'
     login = Column(String, primary_key=True)
     name = Column(String, nullable=False)
@@ -28,7 +30,20 @@ class UserRecord(Base):
     keystore_id = Column(String(64), nullable=False)
     keystore_password = Column(String, nullable=False)
     hashed_password = Column(String(64), nullable=False)
+
+
+class UserRecordV1(Base):
+    __tablename__ = 'user_v1'
+    login = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    disabled = Column(Boolean, nullable=False)
+    keystore_id = Column(String(64), nullable=False)
+    keystore_password = Column(String, nullable=False)
+    hashed_password = Column(String(64), nullable=False)
     login_attempts = Column(Integer, nullable=False)
+
+
+UserRecord = UserRecordV1
 
 
 class User(BaseModel):
@@ -65,6 +80,10 @@ class UserDB:
         Base.metadata.create_all(cls._engine)
         cls._Session = sessionmaker(bind=cls._engine)
 
+        # check if db records need to be migrated
+        logger.info(f"check if user db records need to be migrated")
+        cls.migrate_v0_to_v1()
+
     @classmethod
     def publish_all_user_identities(cls, node_address: (str, int)) -> None:
         for user in UserDB.all_users():
@@ -76,6 +95,35 @@ class UserDB:
             keystore_path = os.path.join(cls._keystore_path, f"{keystore_id}.json")
             cls._keystores[keystore_id] = Keystore.load(keystore_path, keystore_password)
         return cls._keystores[keystore_id]
+
+    @classmethod
+    def migrate_v0_to_v1(cls):
+        """
+        Migrate v0 user records (if any) to v1. Changes from v0 to v1:
+        - introduce column login_attempts
+        :return:
+        """
+        with cls._Session() as session:
+            # do we have any v0 records?
+            records = session.query(UserRecordV0).all()
+            if len(records) > 0:
+                logger.warning(f"found {len(records)} v0 user records -> migrating to v1...")
+
+                # migrate all records -> add v1 record and delete v0 record
+                for record in records:
+                    # add users to the v1 table
+                    session.add(UserRecordV1(login=record.login, name=record.name, disabled=record.disabled,
+                                             keystore_id=record.keystore_id, keystore_password=record.keystore_password,
+                                             hashed_password=record.hashed_password,
+                                             login_attempts=0))
+
+                    # remove users from v0 table
+                    session.query(UserRecordV0).filter_by(login=record.login).delete()
+
+                session.commit()
+
+            else:
+                logger.info(f"no v0 user records found.")
 
     @classmethod
     def get_user(cls, login: str) -> Optional[User]:
@@ -280,7 +328,6 @@ class UserDB:
                     keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password),
                     login_attempts=record.login_attempts
                 )
-
             else:
                 raise AppRuntimeError("Username does not exist", details={
                     'login': login
