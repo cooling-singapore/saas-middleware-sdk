@@ -81,7 +81,7 @@ class UserDB:
         cls._Session = sessionmaker(bind=cls._engine)
 
         # check if db records need to be migrated
-        logger.info(f"check if user db records need to be migrated")
+        logger.info("check if user db records need to be migrated")
         cls.migrate_v0_to_v1()
 
     @classmethod
@@ -123,7 +123,7 @@ class UserDB:
                 session.commit()
 
             else:
-                logger.info(f"no v0 user records found.")
+                logger.info("no v0 user records found.")
 
     @classmethod
     def get_user(cls, login: str) -> Optional[User]:

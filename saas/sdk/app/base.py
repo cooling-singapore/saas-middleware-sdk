@@ -165,7 +165,7 @@ class Application(abc.ABC):
 
     def add_dot(self, dot: DataObjectType) -> None:
         with self._mutex:
-            self._dots[dot.data_type()] = dot
+            self._dots[dot.name()] = dot
 
     def supported_dots(self) -> List[str]:
         with self._mutex:
