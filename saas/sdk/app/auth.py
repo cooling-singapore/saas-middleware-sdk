@@ -95,7 +95,7 @@ class UserDB:
                 return None
 
     @classmethod
-    def delete_user(cls, login: str) -> Optional[User]:
+    def delete_user(cls, login: str) -> User:
         with cls._Session() as session:
             q = session.query(UserRecord).filter_by(login=login)
 
@@ -229,25 +229,24 @@ class UserDB:
             # check if this username exists
             record = session.query(UserRecord).get(login)
             if record:
+                # do we have a new display name? if so, update the record.
                 if user_display_name:
                     record.name = user_display_name
+
+                # do we have a new password? if so, check privileges first, then update it.
                 if password:
-                    # admin has access to change other users password
-                    if is_admin:
-                        record.hashed_password = UserAuth.get_password_hash(password[1])
-                    # check previous password when user changing their password
-                    elif password[0]:
-                        if UserAuth.verify_password(password[0], record.hashed_password):
-                            record.hashed_password = UserAuth.get_password_hash(password[1])
-                        else:
+                    # if we are not admin, we need to have a matching password
+                    if not is_admin:
+                        # verify if the hashes of the current password match
+                        if not UserAuth.verify_password(password[0], record.hashed_password):
                             raise AppRuntimeError("Password does not match", details={
                                 'login': login
                             })
-                    else:
-                        raise AppRuntimeError("Please provide the previous password", details={
-                            'login': login
-                        })
 
+                    # at this point we are either admin or we have a matching password -> update the record
+                    record.hashed_password = UserAuth.get_password_hash(password[1])
+
+                # update the user record and return and updated user object
                 session.commit()
                 return User(
                     login=record.login,
@@ -266,27 +265,23 @@ class UserDB:
     @classmethod
     def update_login_attempts(cls, login: str, successful: bool) -> User:
         with cls._Session() as session:
-            # check if this username already exists
-            user = session.query(UserRecord).get(login)
-
-            if user:
-                # reset the login attempts count, if it's a successful login
-                if successful:
-                    user.login_attempts = 0
-                # increase the login attempts count, if it's a failed login attempt
-                else:
-                    user.login_attempts += 1
+            # check if this username exists
+            record = session.query(UserRecord).get(login)
+            if record:
+                # update the attempt counter (reset to zero if successful)
+                record.login_attempts = 0 if successful else record.login_attempts + 1
                 session.commit()
 
                 return User(
-                    login=user.login,
-                    name=user.name,
-                    disabled=user.disabled,
-                    hashed_password=user.hashed_password,
-                    keystore=cls._resolve_keystore(user.keystore_id, user.keystore_password),
-                    login_attempts=user.login_attempts
+                    login=record.login,
+                    name=record.name,
+                    disabled=record.disabled,
+                    hashed_password=record.hashed_password,
+                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password),
+                    login_attempts=record.login_attempts
                 )
-            elif not user:
+
+            else:
                 raise AppRuntimeError("Username does not exist", details={
                     'login': login
                 })
@@ -308,58 +303,42 @@ class UserAuth:
         return cls._pwd_context.verify(plain_password, hashed_password)
 
     @classmethod
-    def _authenticate_user(cls, login: str, password: str) -> Optional[User]:
-        user = UserDB.get_user(login)
-        # not a user
-        if not user:
-            return None
-
-        # user is not disabled? verify password
-        if not user.disabled:
-            if not cls.verify_password(password, user.hashed_password):
-                # if password is incorrect, update the failed login attempts count
-                user = UserDB.update_login_attempts(login, False)
-                # if the login attempts count has reached the maximum value, disable the user
-                if user.login_attempts >= cls._max_login_attempts:
-                    UserDB.disable_user(login)
-                    return 'locked'
-                return None
-
-            # if credentials and correct and user already has failed login attempts, rest the login attempts count
-            if user.login_attempts > 0:
-                user = UserDB.update_login_attempts(login, True)
-
-            return user
-        else:
-            return 'disabled'
-
-    @classmethod
     def get_password_hash(cls, password: str) -> str:
         return cls._pwd_context.hash(password)
 
     @classmethod
     async def login_for_access_token(cls, form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
-        # get the user
-        user = cls._authenticate_user(form_data.username, form_data.password)
+        # do we have a user object?
+        user = UserDB.get_user(form_data.username)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username or password",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        # The user account has been disabled due to exceeding the limit for failed login attempts
-        elif user == 'locked':
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="The user account is locked due to exceeding the limit for failed login attempts",
-                headers={"WWW-Authenticate": "Locked"},
-            )
-        # The user account has been already disabled due to exceeding the limit for failed login attempts
-        elif user == 'disabled' or user.disabled:
+
+        # is the user account disabled?
+        if user.disabled:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="User account has been locked",
+                detail="User account disabled. Please contact administrator.",
                 headers={"WWW-Authenticate": "Locked"},
+            )
+
+        # verify the password and update the login attempt counter
+        valid_password = cls.verify_password(form_data.password, user.hashed_password)
+        user = UserDB.update_login_attempts(form_data.username, valid_password)
+
+        # was password verification successful? if not, raise an error
+        if not valid_password:
+            # have login attempts exceeded the limit? disable account
+            if user.login_attempts >= cls._max_login_attempts:
+                UserDB.disable_user(form_data.username)
+
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Bearer"},
             )
 
         # create the token
