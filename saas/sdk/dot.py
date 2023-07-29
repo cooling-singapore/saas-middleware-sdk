@@ -2,6 +2,9 @@ import abc
 
 from typing import Dict, List
 
+from pydantic import BaseModel
+from pydantic.typing import Literal
+
 from saas.core.exceptions import ExceptionContent
 from saas.core.helpers import generate_random_string
 
@@ -27,14 +30,36 @@ class DOTRuntimeError(Exception):
         return self._content
 
 
+class DOTVerificationMessage(BaseModel):
+    severity: Literal['info', 'warning', 'error']
+    message: str
+
+
+class DOTVerificationResult(BaseModel):
+    messages: List[DOTVerificationMessage]
+    is_verified: bool
+
+
 class DataObjectType(abc.ABC):
     @abc.abstractmethod
-    def data_type(self) -> str:
+    def name(self) -> str:
+        pass
+
+    @abc.abstractmethod
+    def label(self) -> str:
         pass
 
     @abc.abstractmethod
     def supported_formats(self) -> List[str]:
         pass
+
+    def verify_content(self, content_path: str, data_format: str) -> DOTVerificationResult:
+        return DOTVerificationResult(
+            messages=[
+                DOTVerificationMessage(severity='error', message=f'verify_content() not implemented for {self.name()}')
+            ],
+            is_verified=False
+        )
 
     @abc.abstractmethod
     def extract_feature(self, content_path: str, parameters: dict) -> Dict:
