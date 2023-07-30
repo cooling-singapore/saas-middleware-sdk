@@ -228,12 +228,21 @@ class SDKJob:
         self._session = session
 
     def refresh_status(self) -> bool:
-        status = self._rti.get_job_status(self._job.id, self._authority)
-        if status:
-            with self._mutex:
-                self._status = status
-            return True
-        else:
+        try:
+            status = self._rti.get_job_status(self._job.id, self._authority)
+            if status:
+                with self._mutex:
+                    self._status = status
+                return True
+            else:
+                return False
+
+        except SaaSRuntimeException as e:
+            logger.warning(f"failed to refresh job status -> id={e.id} reason={e.reason} details:{e.details}")
+            return False
+
+        except Exception as e:
+            logger.warning(f"failed to refresh job status -> unexpected exception={e}")
             return False
 
     @property
