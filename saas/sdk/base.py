@@ -6,6 +6,7 @@ import time
 from typing import List, Union, Dict, Optional, Callable
 
 from pydantic import BaseModel
+from pydantic.typing import Literal
 
 from saas.core.exceptions import SaaSRuntimeException
 from saas.core.helpers import validate_json, get_timestamp_now
@@ -28,6 +29,11 @@ class SDKProductSpecification(BaseModel):
     content_encrypted: Optional[bool]
     target_node: Optional[NodeInfo]
     owner: Optional[Identity]
+
+
+class LogMessage(BaseModel):
+    severity: Literal['debug', 'info', 'warning', 'error']
+    message: str
 
 
 class SDKProcessor:
@@ -293,7 +299,7 @@ class SDKJob:
             return status
 
     def wait(self, pace: float = 1.0, callback_progress: Callable[[int], None] = None,
-             callback_message: Callable[[str], None] = None) -> Dict[str, SDKCDataObject]:
+             callback_message: Callable[[LogMessage], None] = None) -> Dict[str, SDKCDataObject]:
         # wait until the job has finished
         prev_message = None
         while True:
@@ -310,7 +316,13 @@ class SDKJob:
                     # do we have a different message than before?
                     message = status.notes['message']
                     if message != prev_message:
-                        callback_message(message)
+                        # convert into log message
+                        try:
+                            log_message = LogMessage.parse_obj(message)
+                        except Exception:
+                            log_message = LogMessage(severity='warning', message=f"Malformed message: {message}")
+
+                        callback_message(log_message)
                         prev_message = message
 
             if status.state in [JobStatus.State.INITIALISED, JobStatus.State.RUNNING]:
