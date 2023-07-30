@@ -318,7 +318,8 @@ class SDKJob:
                     if message != prev_message:
                         # convert into log message
                         try:
-                            log_message = LogMessage.parse_obj(message)
+                            temp = message.split(':', 1)
+                            log_message = LogMessage(severity=temp[0], message=temp[1])
                         except Exception:
                             log_message = LogMessage(severity='warning', message=f"Malformed message: {message}")
 
