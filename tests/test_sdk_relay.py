@@ -78,7 +78,7 @@ class RelayServerTestCase(unittest.TestCase):
 
             # upload test processor
             source = 'https://github.com/cooling-singapore/saas-middleware-sdk'
-            commit_id = '310354f'
+            commit_id = '5efcd1e'
             proc_path = 'examples/adapters/proc_example'
             proc_config = 'default'
             self._gpp = self._context.upload_gpp(source, commit_id, proc_path, proc_config)

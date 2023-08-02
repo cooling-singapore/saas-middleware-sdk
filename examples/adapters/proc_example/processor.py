@@ -9,7 +9,7 @@ logger = logging.getLogger('example-processor')
 
 def function(working_directory):
     print("trigger:progress:0")
-    print("trigger:message:This is a message at the very beginning of the process.")
+    print("trigger:message:info:This is a message at the very beginning of the process.")
 
     a_path = os.path.join(working_directory, 'a')
     with open(a_path, 'r') as f:
@@ -32,9 +32,9 @@ def function(working_directory):
     }
     print(f"c={c}")
     print("trigger:progress:60")
-    print(f"trigger:message:a={a}")
-    print(f"trigger:message:b={b}")
-    print(f"trigger:message:c={c}")
+    print(f"trigger:message:info:a={a}")
+    print(f"trigger:message:info:b={b}")
+    print(f"trigger:message:info:c={c}")
     time.sleep(0.2)
 
     c_path = os.path.join(working_directory, 'c')
@@ -45,7 +45,7 @@ def function(working_directory):
     time.sleep(0.2)
 
     print("trigger:progress:100")
-    print("trigger:message:...and we are done!")
+    print("trigger:message:info:...and we are done!")
 
 
 if __name__ == '__main__':

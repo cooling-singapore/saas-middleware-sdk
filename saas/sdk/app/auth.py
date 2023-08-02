@@ -6,7 +6,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from sqlalchemy import Column, String, Boolean, create_engine
+from saas.core.logging import Logging
+from sqlalchemy import Column, String, Boolean, create_engine, Integer
 from sqlalchemy.orm import sessionmaker, declarative_base
 from jose import jwt
 
@@ -18,9 +19,10 @@ from saas.sdk.app.exceptions import AppRuntimeError
 from saas.sdk.base import publish_identity
 
 Base = declarative_base()
+logger = Logging.get('saas.sdk.app')
 
 
-class UserRecord(Base):
+class UserRecordV0(Base):
     __tablename__ = 'user'
     login = Column(String, primary_key=True)
     name = Column(String, nullable=False)
@@ -28,6 +30,20 @@ class UserRecord(Base):
     keystore_id = Column(String(64), nullable=False)
     keystore_password = Column(String, nullable=False)
     hashed_password = Column(String(64), nullable=False)
+
+
+class UserRecordV1(Base):
+    __tablename__ = 'user_v1'
+    login = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    disabled = Column(Boolean, nullable=False)
+    keystore_id = Column(String(64), nullable=False)
+    keystore_password = Column(String, nullable=False)
+    hashed_password = Column(String(64), nullable=False)
+    login_attempts = Column(Integer, nullable=False)
+
+
+UserRecord = UserRecordV1
 
 
 class User(BaseModel):
@@ -39,6 +55,7 @@ class User(BaseModel):
     disabled: bool
     hashed_password: str
     keystore: Keystore
+    login_attempts: int
 
     @property
     def identity(self) -> Identity:
@@ -63,6 +80,10 @@ class UserDB:
         Base.metadata.create_all(cls._engine)
         cls._Session = sessionmaker(bind=cls._engine)
 
+        # check if db records need to be migrated
+        logger.info("check if user db records need to be migrated")
+        cls.migrate_v0_to_v1()
+
     @classmethod
     def publish_all_user_identities(cls, node_address: (str, int)) -> None:
         for user in UserDB.all_users():
@@ -76,6 +97,35 @@ class UserDB:
         return cls._keystores[keystore_id]
 
     @classmethod
+    def migrate_v0_to_v1(cls):
+        """
+        Migrate v0 user records (if any) to v1. Changes from v0 to v1:
+        - introduce column login_attempts
+        :return:
+        """
+        with cls._Session() as session:
+            # do we have any v0 records?
+            records = session.query(UserRecordV0).all()
+            if len(records) > 0:
+                logger.warning(f"found {len(records)} v0 user records -> migrating to v1...")
+
+                # migrate all records -> add v1 record and delete v0 record
+                for record in records:
+                    # add users to the v1 table
+                    session.add(UserRecordV1(login=record.login, name=record.name, disabled=record.disabled,
+                                             keystore_id=record.keystore_id, keystore_password=record.keystore_password,
+                                             hashed_password=record.hashed_password,
+                                             login_attempts=0))
+
+                    # remove users from v0 table
+                    session.query(UserRecordV0).filter_by(login=record.login).delete()
+
+                session.commit()
+
+            else:
+                logger.info("no v0 user records found.")
+
+    @classmethod
     def get_user(cls, login: str) -> Optional[User]:
         with cls._Session() as session:
             record = session.query(UserRecord).get(login)
@@ -85,14 +135,15 @@ class UserDB:
                     name=record.name,
                     disabled=record.disabled,
                     hashed_password=record.hashed_password,
-                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
+                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password),
+                    login_attempts=record.login_attempts
                 )
 
             else:
                 return None
 
     @classmethod
-    def delete_user(cls, login: str) -> Optional[User]:
+    def delete_user(cls, login: str) -> User:
         with cls._Session() as session:
             q = session.query(UserRecord).filter_by(login=login)
 
@@ -109,7 +160,8 @@ class UserDB:
                 name=record.name,
                 disabled=record.disabled,
                 hashed_password=record.hashed_password,
-                keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
+                keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password),
+                login_attempts=record.login_attempts
             )
 
             # remove the keystore and delete it
@@ -132,7 +184,8 @@ class UserDB:
                 name=record.name,
                 disabled=record.disabled,
                 hashed_password=record.hashed_password,
-                keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
+                keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password),
+                login_attempts=record.login_attempts
             ) for record in records]
 
     @classmethod
@@ -155,7 +208,7 @@ class UserDB:
             hashed_password = UserAuth.get_password_hash(password)
             session.add(UserRecord(login=login, name=name, disabled=disabled,
                                    keystore_id=keystore.identity.id, keystore_password=keystore_password,
-                                   hashed_password=hashed_password))
+                                   hashed_password=hashed_password, login_attempts=0))
             session.commit()
 
             # publish the identity (if we have a node address)
@@ -168,7 +221,8 @@ class UserDB:
                 name=name,
                 disabled=disabled,
                 hashed_password=hashed_password,
-                keystore=keystore
+                keystore=keystore,
+                login_attempts=0
             )
 
     @classmethod
@@ -178,6 +232,7 @@ class UserDB:
             record = session.query(UserRecord).get(login)
             if record:
                 record.disabled = False
+                record.login_attempts = 0
                 session.commit()
 
                 return User(
@@ -185,7 +240,8 @@ class UserDB:
                     name=record.name,
                     disabled=record.disabled,
                     hashed_password=record.hashed_password,
-                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
+                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password),
+                    login_attempts=record.login_attempts
                 )
             else:
                 raise AppRuntimeError("Username does not exist", details={
@@ -206,7 +262,8 @@ class UserDB:
                     name=record.name,
                     disabled=record.disabled,
                     hashed_password=record.hashed_password,
-                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
+                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password),
+                    login_attempts=record.login_attempts
                 )
             else:
                 raise AppRuntimeError("Username does not exist", details={
@@ -220,34 +277,57 @@ class UserDB:
             # check if this username exists
             record = session.query(UserRecord).get(login)
             if record:
+                # do we have a new display name? if so, update the record.
                 if user_display_name:
                     record.name = user_display_name
+
+                # do we have a new password? if so, check privileges first, then update it.
                 if password:
-                    # admin has access to change other users password
-                    if is_admin:
-                        record.hashed_password = UserAuth.get_password_hash(password[1])
-                    # check previous password when user changing their password
-                    elif password[0]:
-                        if UserAuth.verify_password(password[0], record.hashed_password):
-                            record.hashed_password = UserAuth.get_password_hash(password[1])
-                        else:
+                    # if we are not admin, we need to have a matching password
+                    if not is_admin:
+                        # verify if the hashes of the current password match
+                        if not UserAuth.verify_password(password[0], record.hashed_password):
                             raise AppRuntimeError("Password does not match", details={
                                 'login': login
                             })
-                    else:
-                        raise AppRuntimeError("Please provide the previous password", details={
-                            'login': login
-                        })
 
+                    # at this point we are either admin or we have a matching password -> update the record
+                    record.hashed_password = UserAuth.get_password_hash(password[1])
+
+                # update the user record and return and updated user object
                 session.commit()
                 return User(
                     login=record.login,
                     name=record.name,
                     disabled=record.disabled,
                     hashed_password=record.hashed_password,
-                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password)
+                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password),
+                    login_attempts=record.login_attempts
                 )
 
+            else:
+                raise AppRuntimeError("Username does not exist", details={
+                    'login': login
+                })
+
+    @classmethod
+    def update_login_attempts(cls, login: str, successful: bool) -> User:
+        with cls._Session() as session:
+            # check if this username exists
+            record = session.query(UserRecord).get(login)
+            if record:
+                # update the attempt counter (reset to zero if successful)
+                record.login_attempts = 0 if successful else record.login_attempts + 1
+                session.commit()
+
+                return User(
+                    login=record.login,
+                    name=record.name,
+                    disabled=record.disabled,
+                    hashed_password=record.hashed_password,
+                    keystore=cls._resolve_keystore(record.keystore_id, record.keystore_password),
+                    login_attempts=record.login_attempts
+                )
             else:
                 raise AppRuntimeError("Username does not exist", details={
                     'login': login
@@ -258,6 +338,7 @@ class UserAuth:
     secret_key = None
     algorithm = 'HS256'
     _access_token_expires_minutes = 30
+    _max_login_attempts = 5
     _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
     @classmethod
@@ -269,25 +350,38 @@ class UserAuth:
         return cls._pwd_context.verify(plain_password, hashed_password)
 
     @classmethod
-    def _authenticate_user(cls, login: str, password: str) -> Optional[User]:
-        user = UserDB.get_user(login)
-        if not user:
-            return None
-
-        if not cls.verify_password(password, user.hashed_password):
-            return None
-
-        return user
-
-    @classmethod
     def get_password_hash(cls, password: str) -> str:
         return cls._pwd_context.hash(password)
 
     @classmethod
     async def login_for_access_token(cls, form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
-        # get the user
-        user = cls._authenticate_user(form_data.username, form_data.password)
+        # do we have a user object?
+        user = UserDB.get_user(form_data.username)
         if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # is the user account disabled?
+        if user.disabled:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account disabled. Please contact administrator.",
+                headers={"WWW-Authenticate": "Locked"},
+            )
+
+        # verify the password and update the login attempt counter
+        valid_password = cls.verify_password(form_data.password, user.hashed_password)
+        user = UserDB.update_login_attempts(form_data.username, valid_password)
+
+        # was password verification successful? if not, raise an error
+        if not valid_password:
+            # have login attempts exceeded the limit? disable account
+            if user.login_attempts >= cls._max_login_attempts:
+                UserDB.disable_user(form_data.username)
+
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username or password",
