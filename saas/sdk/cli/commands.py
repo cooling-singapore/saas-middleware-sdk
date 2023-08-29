@@ -79,7 +79,7 @@ class UserCreate(CLICommand):
                      help="the login for this account"),
             Argument('--name', dest='name', action='store', required=False,
                      help="the name of the user"),
-            Argument('--password', dest='password', action='store', required=False,
+            Argument('--user_password', dest='user_password', action='store', required=False,
                      help="the password of the user")
         ])
 
@@ -98,21 +98,21 @@ class UserCreate(CLICommand):
         prompt_if_missing(args, 'name', prompt_for_string, message="Enter the name:")
 
         # check the password
-        prompt_if_missing(args, 'password', prompt_for_string, allow_empty=True, hide=True,
+        prompt_if_missing(args, 'user_password', prompt_for_string, allow_empty=True, hide=True,
                           message="Enter the password [leave empty to generate]:")
-        if len(args['password']) == 0:
-            args['password'] = generate_random_string(8)
-            print(f"Using generated password: {args['password']}")
+        if len(args['user_password']) == 0:
+            args['user_password'] = generate_random_string(8)
+            print(f"Using generated password: {args['user_password']}")
 
         # create the user
-        user: User = UserDB.add_user(args['login'], args['name'], args['password'])
+        user: User = UserDB.add_user(args['login'], args['name'], args['user_password'])
         print(f"User account created: {user.login}")
 
         # publish the identity of the user
         identity = user.keystore.identity
         print(f"Publish identity {identity.id} of user {user.login} to node at {args['node_address']}")
-        server_keystore = load_keystore(args, ensure_publication=True, address_arg='node_address')
-        context = connect(extract_address(args['node_address']), server_keystore)
+        # server_keystore = load_keystore(args, ensure_publication=True, address_arg='node_address')
+        context = connect(extract_address(args['node_address']), user.keystore)
         context.publish_identity(user.keystore.identity)
 
 
